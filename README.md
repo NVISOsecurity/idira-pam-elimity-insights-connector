@@ -63,3 +63,7 @@ Data collected from the Idira PAM environment:
 - User and group details for all users and groups that the Vault API user can see (based on its location in the Vault location tree) - this includes Idira Identity roles in a PrivCloud environment
 - All Vault authorizations and which users/groups are assigned to them
 - All platform information and which accounts are assigned to them
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
