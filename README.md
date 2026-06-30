@@ -18,9 +18,9 @@ Fill out the credential information with the user details you created in PAM / P
 ## Prerequisites - Elimity Insights
 
 1. Create a new source in Elimity Insights using the "Custom" preset
-2. Import the data model from the `.json` file in the "Elimity-Source-Data-Model" directory.
-3. In the source under "Settings", generate API credentials for this source
-4. Set the source id and secret in the ".env" file.
+2. Import the data model from the `.json` file in the "Elimity-Source-Data-Model" directory
+3. In the source under "Settings > Elimity Insights API credentials", generate API credentials for this source
+4. Set the source id and secret in the ".env" file
 
 ## Prerequisites - Idira PAM
 
@@ -33,7 +33,7 @@ This user must be using password authentication.
 2. Give it the "Audit Users" authorization
 3. Either
     1. Add it to the "Auditors" group to see all accounts, or
-    2. Add it to individual safes with the "List Accounts" permission.
+    2. Add it to individual safes with the "List Accounts" permission
 4. Set the URL and API credentials in the ".env" file
 
 ### PrivCloud ISPSS
@@ -42,7 +42,7 @@ This user must be using password authentication.
 2. Enable the "Is OAuth confidential client" property
 3. Either
     1. Add it to the "Privilege Cloud Auditors" role, or
-    2. Add it to a role to enable PrivCloud login, and add it to individual safes with the "List Accounts" permission.
+    2. Add it to a role to enable PrivCloud login, and add it to individual safes with the "List Accounts" permission
 4. Set the URL and API credentials in the ".env" file
 
 ## Run using `uv`
@@ -54,6 +54,8 @@ This user must be using password authentication.
 ```shell
 uv run upload-pam-data-to-elimity.py
 ```
+
+If you encounter an issue, check the script's logs in the `logs/` directory.
 
 ## Collected Data
 
