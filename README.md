@@ -9,11 +9,17 @@ It was tested with PAM Self-Hosted v15.0 and Privilege Cloud ISPSS v14.9.
 
 The *old* PrivCloud "Standard" infrastructure is not supported by this script.
 
+## .env file creation - for providing environment configuration and credentials
+
+Rename the `.env.example` file to `.env`, and uncomment the variables in *either* the "Idira PAM Configuration Variables" section or the "Idira Privilege Cloud Configuration Variables" section.
+
+Fill out the credential information with the user details you created in PAM / PrivCloud and the Elimity source information.
+
 ## Prerequisites - Elimity Insights
 
 1. Create a new source in Elimity Insights using the "Custom" preset
 2. Import the data model from the `.json` file in the "Elimity-Source-Data-Model" directory.
-3. Generate API credentials for this source
+3. In the source under "Settings", generate API credentials for this source
 4. Set the source id and secret in the ".env" file.
 
 ## Prerequisites - Idira PAM
@@ -38,12 +44,6 @@ This user must be using password authentication.
     1. Add it to the "Privilege Cloud Auditors" role, or
     2. Add it to a role to enable PrivCloud login, and add it to individual safes with the "List Accounts" permission.
 4. Set the URL and API credentials in the ".env" file
-
-## .env file creation - for providing environment configuration and credentials
-
-Rename the `.env.example` file to `.env`, and uncomment the variables in *either* the "Idira PAM Configuration Variables" section or the "Idira Privilege Cloud Configuration Variables" section.
-
-Fill out the credential information with the user details you created in PAM / PrivCloud and the Elimity source information.
 
 ## Run using `uv`
 
