@@ -399,6 +399,7 @@ def main():
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = f"logs/{timestamp}.log"
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
 
     # Create log handlers
     console_handler = logging.StreamHandler()
@@ -496,7 +497,7 @@ def main():
         logger.error(f"Environment type {idira_pam_env_type} not supported!")
         sys.exit(1)
 
-    logger.info(f"🤖 Using PVWA URL: {pvwa_url}")
+    logger.info(f"🤖 Using PAM API URL: {pvwa_url}")
 
     safes_to_skip_patterns: List[str] = [element.strip() for element in cyberark_safes_to_skip.split(",") if element.strip()]
 
