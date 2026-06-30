@@ -1,1 +1,722 @@
-{"entityAttributeTypes":[{"archived":false,"description":"Safe name","entityTypeId":"safe","id":"name","name":"Name","type":"string"},{"archived":false,"description":"Internal safe number","entityTypeId":"safe","id":"safe_number","name":"Safe Number","type":"number"},{"archived":false,"description":"Safe description","entityTypeId":"safe","id":"description","name":"Description","type":"string"},{"archived":false,"description":"Username of the user that created the safe","entityTypeId":"safe","id":"created_by_name","name":"Created by (Username)","type":"string"},{"archived":false,"description":"Date and time when the safe was created","entityTypeId":"safe","id":"creation_datetime","name":"Creation Date","type":"dateTime"},{"archived":false,"description":"Date and time of the last modification to the safe","entityTypeId":"safe","id":"last_modification_date","name":"Last Modification Date","type":"dateTime"},{"archived":false,"description":"Internal User Id (not the user name!) Of The User Who Created The Safe","entityTypeId":"safe","id":"created_by_internal_user_id","name":"Created by (Internal User ID)","type":"string"},{"archived":false,"description":"Name of the safe that this members belongs to","entityTypeId":"safe_member","id":"safe_name","name":"Safe Name","type":"string"},{"archived":false,"description":"If this safe member is a group","entityTypeId":"safe_member","id":"member_type_is_group","name":"Member Type is Group","type":"boolean"},{"archived":false,"description":"If This Safe Member Is A User","entityTypeId":"safe_member","id":"member_type_is_user","name":"Member Type is User","type":"boolean"},{"archived":false,"description":"Name of the Safe Member","entityTypeId":"safe_member","id":"safe_member_name","name":"Safe Member Name","type":"string"},{"archived":false,"description":"Platform ID (aka Policy ID) of the Account","entityTypeId":"account","id":"platform_id","name":"Platform ID","type":"string"},{"archived":false,"description":"Safe Name of the Account","entityTypeId":"account","id":"safe_name","name":"Safe Name","type":"string"},{"archived":false,"description":"Username of the Account","entityTypeId":"account","id":"username","name":"username","type":"string"},{"archived":false,"description":"Address of the Account","entityTypeId":"account","id":"address","name":" Address","type":"string"},{"archived":false,"description":"Status of the Account","entityTypeId":"account","id":"status","name":"Status","type":"string"},{"archived":false,"description":"Logon To value (aka Logon Domain) of the Account (optional)","entityTypeId":"account","id":"logon_domain","name":"Logon To","type":"string"},{"archived":false,"description":"Type of the Vault User (which license count it uses)","entityTypeId":"vault_user","id":"user_type","name":"User Type","type":"string"},{"archived":false,"description":"If this Vault User is enabled in the Vault","entityTypeId":"vault_user","id":"is_enabled","name":"Is Enabled","type":"boolean"},{"archived":false,"description":"If this Vault User is suspended (after too many wrong Authn attempts)","entityTypeId":"vault_user","id":"is_suspended","name":"Is Suspended","type":"boolean"},{"archived":false,"description":"User's first name as defined in the Vault","entityTypeId":"vault_user","id":"first_name","name":"First Name","type":"string"},{"archived":false,"description":"User's last name as defined in the Vault","entityTypeId":"vault_user","id":"last_name","name":"Last Name","type":"string"},{"archived":false,"description":"If this user has the \"Add/Update\" User Authorization in the Vault","entityTypeId":"vault_user","id":"has_add_update_user_authz","name":"Has Add/Update User Authorization","type":"boolean"},{"archived":false,"description":"If This User has the \"Audit Users\" Authorization In The Vault","entityTypeId":"vault_user","id":"has_audit_users_authz","name":"Has Audit Users Authorization","type":"boolean"},{"archived":false,"description":"Group's Description","entityTypeId":"vault_group","id":"description","name":"Description","type":"string"},{"archived":false,"description":"Group's Type (Vault or Directory)","entityTypeId":"vault_group","id":"group_type","name":"Group Type","type":"string"}],"entityTypes":[{"anonymized":false,"icon":"storage","id":"safe","plural":"Safes","singular":"Safe"},{"anonymized":false,"icon":"lock_person","id":"safe_member","plural":"Safe Members","singular":"Safe Member"},{"anonymized":false,"icon":"lock_open","id":"account","plural":"Accounts","singular":"Account"},{"anonymized":false,"icon":"person","id":"vault_user","plural":"Vault Users","singular":"Vault User"},{"anonymized":false,"icon":"group","id":"vault_group","plural":"Vault Groups","singular":"Vault Group"}],"relationshipAttributeTypes":[{"archived":false,"childType":"safe_member","description":"If this Safe Member has the Retrieve Account Permission on this Safe","id":"retrieve_account_permission","name":"Retrieve Account Permission","parentType":"safe","type":"boolean"},{"archived":false,"childType":"safe_member","description":"If this Safe Member has the Use Account Permission on this Safe","id":"use_account_permission","name":"Use Account Permission","parentType":"safe","type":"boolean"}],"relationshipTypes":[{"fromEntityTypeId":"safe","id":145,"toEntityTypeId":"safe_member","withoutRelationships":false},{"fromEntityTypeId":"safe","id":146,"toEntityTypeId":"account","withoutRelationships":false},{"fromEntityTypeId":"vault_group","id":147,"toEntityTypeId":"vault_user","withoutRelationships":false},{"fromEntityTypeId":"vault_group","id":148,"toEntityTypeId":"vault_group","withoutRelationships":true}]}
+{
+    "entityAttributeTypes": [
+        {
+            "archived": false,
+            "description": "User's first name",
+            "entityTypeId": "vault_user",
+            "id": "first_name",
+            "name": "First Name",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User's middle name",
+            "entityTypeId": "vault_user",
+            "id": "middle_name",
+            "name": "Middle Name",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User's last name",
+            "entityTypeId": "vault_user",
+            "id": "last_name",
+            "name": "Last Name",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User's organization",
+            "entityTypeId": "vault_user",
+            "id": "organization",
+            "name": "Organization",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User's department",
+            "entityTypeId": "vault_user",
+            "id": "department",
+            "name": "Department",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User type (relevant for licensing)",
+            "entityTypeId": "vault_user",
+            "id": "type",
+            "name": "Type",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If the user is enabled and can log in",
+            "entityTypeId": "vault_user",
+            "id": "is_enabled",
+            "name": "Is Enabled",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If the user is suspended (because of authentication failures)",
+            "entityTypeId": "vault_user",
+            "id": "is_suspended",
+            "name": "Is Suspended",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "User's source (Vault or LDAP directory)",
+            "entityTypeId": "vault_user",
+            "id": "source",
+            "name": "Source",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User's location in the Vault hierarchy",
+            "entityTypeId": "vault_user",
+            "id": "location",
+            "name": "Location",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If the user is a component user",
+            "entityTypeId": "vault_user",
+            "id": "is_component_user",
+            "name": "Is Component User",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If the user's password is set to never expire",
+            "entityTypeId": "vault_user",
+            "id": "password_never_expires",
+            "name": "Password Never Expires",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If the user will be forced to change their password on the next login",
+            "entityTypeId": "vault_user",
+            "id": "change_pass_on_next_logon",
+            "name": "Must Change Password",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "User's distinguished name",
+            "entityTypeId": "vault_user",
+            "id": "distinguished_name",
+            "name": "Distinguished Name",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User's description",
+            "entityTypeId": "vault_user",
+            "id": "description",
+            "name": "Description",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "User's business email",
+            "entityTypeId": "vault_user",
+            "id": "business_email",
+            "name": "Business Email",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Time of the user's last successful logon",
+            "entityTypeId": "vault_user",
+            "id": "last_successful_logon",
+            "name": "Last Successful Logon",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "description": "If the platform allows a CPM change to be initiated manually",
+            "entityTypeId": "platform",
+            "id": "allow_manual_change",
+            "name": "Allow Manual Change",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If the platform allows a CPM reconciliation to be initiated manually",
+            "entityTypeId": "platform",
+            "id": "allow_manual_reconciliation",
+            "name": "Allow Manual Reconciliation",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If the platform allows a CPM verification to be initiated manually",
+            "entityTypeId": "platform",
+            "id": "allow_manual_verification",
+            "name": "Allow Manual Verification",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "Which safes account that use this platform can be stored in, and which safes CPM will search when finding accounts of this platform",
+            "entityTypeId": "platform",
+            "id": "allowed_safes",
+            "name": "Allowed Safes",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If CPM should automatically attempt to reconcile an account if verification fails",
+            "entityTypeId": "platform",
+            "id": "automatic_reconciliation_when_unsynched",
+            "name": "Automatic Reconciliation When Unsynched",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If accounts assigned to this platform need to be checked out before use",
+            "entityTypeId": "platform",
+            "id": "enforce_checkin_checkout_exclusive_access",
+            "name": "Enforce Checkin Checkout Exclusive Access",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If CPM should change an account password after it has been used",
+            "entityTypeId": "platform",
+            "id": "enforce_one_time_password_access",
+            "name": "Enforce One Time Password Access",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If this platform is enabled",
+            "entityTypeId": "platform",
+            "id": "is_active",
+            "name": "Is Active",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If CPM should perform regular password changes",
+            "entityTypeId": "platform",
+            "id": "perform_periodic_change",
+            "name": "Perform Periodic Change",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If CPM should perform regular password verifications",
+            "entityTypeId": "platform",
+            "id": "perform_periodic_verification",
+            "name": "Perform Periodic Verification",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "ID of the PSM server or loadbalancer assigned to this platform",
+            "entityTypeId": "platform",
+            "id": "psm_server_id",
+            "name": "PSM Server Id",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If sessions shall be recorded",
+            "entityTypeId": "platform",
+            "id": "record_and_save_session_activity",
+            "name": "Record and Save Session Activity",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "If accounts should use the \"request-approve\" workflow before they can be used",
+            "entityTypeId": "platform",
+            "id": "require_dual_control_password_access_approval",
+            "name": "Require Dual Control Password Access Approval",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "How frequently (in days) passwords should be changed",
+            "entityTypeId": "platform",
+            "id": "require_password_change_every_x_days",
+            "name": "Require Password Change Every X Days",
+            "type": "number"
+        },
+        {
+            "archived": false,
+            "description": "How frequently (in days) passwords should be verified",
+            "entityTypeId": "platform",
+            "id": "require_password_verification_every_x_days",
+            "name": "Require Password Verification Every X Days",
+            "type": "number"
+        },
+        {
+            "archived": false,
+            "description": "If sessions must use PSM/PSMP",
+            "entityTypeId": "platform",
+            "id": "require_privileged_session_management_and_isolation",
+            "name": "Require Privileged Session Management and Isolation",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "Platform type (regular or group)",
+            "entityTypeId": "platform",
+            "id": "platform_type",
+            "name": "Platform Type",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Platform's description",
+            "entityTypeId": "platform",
+            "id": "description",
+            "name": "Description",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Group's description",
+            "entityTypeId": "vault_group",
+            "id": "description",
+            "name": "Description",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Group's type",
+            "entityTypeId": "vault_group",
+            "id": "type",
+            "name": "Type",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Group's location in the Vault hierarchy",
+            "entityTypeId": "vault_group",
+            "id": "location",
+            "name": "Location",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Name Of The Safe That This Permission Applies To",
+            "entityTypeId": "safe_permission",
+            "id": "safe_name",
+            "name": "Safe Name",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Type Of Safe Permission (List accounts, Use accounts, Add accounts, Manage Safe, ...)",
+            "entityTypeId": "safe_permission",
+            "id": "safe_permission_type",
+            "name": "Safe Permission Type",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Internal User Id (Not The User Name!) Of The User Who Created The Safe",
+            "entityTypeId": "safe",
+            "id": "created_by_internal_user_id",
+            "name": "Created by (Internal User ID)",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Username Of The User That Created The Safe",
+            "entityTypeId": "safe",
+            "id": "created_by_name",
+            "name": "Created by (Username)",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Date And Time When The Safe Was Created",
+            "entityTypeId": "safe",
+            "id": "creation_datetime",
+            "name": "Creation Date",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "description": "Safe Description",
+            "entityTypeId": "safe",
+            "id": "description",
+            "name": "Description",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Date And Time Of The Last Modification To The Safe",
+            "entityTypeId": "safe",
+            "id": "last_modification_datetime",
+            "name": "Last Modification Date",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "description": "If objects in this safe are deleted automatically based on the \"Object History Retention\" setting",
+            "entityTypeId": "safe",
+            "id": "auto_purge_enabled",
+            "name": "Auto Purge Enabled",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "Name of the CPM server managing accounts in this safe",
+            "entityTypeId": "safe",
+            "id": "managing_cpm",
+            "name": "Managing CPM",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "The number of days that password versions are saved in the safe",
+            "entityTypeId": "safe",
+            "id": "number_of_days_retention",
+            "name": "Number of Days Retention",
+            "type": "number"
+        },
+        {
+            "archived": false,
+            "description": "The number of retained versions of every password that is stored in the safe",
+            "entityTypeId": "safe",
+            "id": "number_of_versions_retention",
+            "name": "Number of Versions Retention",
+            "type": "number"
+        },
+        {
+            "archived": false,
+            "description": "If OLAC (Object Level Access Control) is enabled for this safe",
+            "entityTypeId": "safe",
+            "id": "olac_enabled",
+            "name": "OLAC Enabled",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "Account's username",
+            "entityTypeId": "account",
+            "id": "username",
+            "name": "Username",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Account's address",
+            "entityTypeId": "account",
+            "id": "address",
+            "name": "Address",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If CPM currently manages this account",
+            "entityTypeId": "account",
+            "id": "automatic_management_is_enabled",
+            "name": "Automatic Management is Enabled",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "Reason for the CPM account management being disabled",
+            "entityTypeId": "account",
+            "id": "cpm_disable_reason",
+            "name": "CPM Disable Reason",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Last CPM error message",
+            "entityTypeId": "account",
+            "id": "cpm_error_details",
+            "name": "CPM Error Details",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "CPM Status of the Account",
+            "entityTypeId": "account",
+            "id": "cpm_status",
+            "name": "CPM Status",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If The Account Is Scheduled For Deletion: The User Who Deleted The Account",
+            "entityTypeId": "account",
+            "id": "deleted_by",
+            "name": "Deleted By",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If The Account Is Scheduled For Deletion: Date Of The Deletion",
+            "entityTypeId": "account",
+            "id": "deletion_date",
+            "name": "Deletion Date",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "description": "Dual Control Status (If Request-approve Workflow Is Required Or Not)",
+            "entityTypeId": "account",
+            "id": "dual_control_status",
+            "name": "Dual Control Status",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "If the account is compliant with the current policy for scheduled changes",
+            "entityTypeId": "account",
+            "id": "compliance_is_compliant",
+            "name": "Is Compliant",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "description": "The Type Of The Last Modification To The Account Or Secret",
+            "entityTypeId": "account",
+            "id": "last_modification_type",
+            "name": "Last Modification Type",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "The Vault User Who Last Modified This Account",
+            "entityTypeId": "account",
+            "id": "last_modified_by",
+            "name": "Last Modified By",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Date and Time That The Account Was Last Modified",
+            "entityTypeId": "account",
+            "id": "last_modified_time",
+            "name": "Last Modified Time",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "description": "Date and Time that the account was last reconciled",
+            "entityTypeId": "account",
+            "id": "last_reconciled_time",
+            "name": "Last Reconciled Time",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "description": "Date and time the account was last verified",
+            "entityTypeId": "account",
+            "id": "last_verified_time",
+            "name": "Last Verified Time",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "description": "Logon To Value (Aka Logon Domain) Of The Account (Optional)",
+            "entityTypeId": "account",
+            "id": "logon_domain",
+            "name": "Logon To",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Platform ID (Aka Policy ID) Of The Account",
+            "entityTypeId": "account",
+            "id": "platform_id",
+            "name": "Platform ID",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Name of the safe the account is stored in",
+            "entityTypeId": "account",
+            "id": "safe_name",
+            "name": "Safe Name",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Account's status property",
+            "entityTypeId": "account",
+            "id": "status",
+            "name": "Status",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Combination Field: Username And Address",
+            "entityTypeId": "account",
+            "id": "username+address",
+            "name": "Username+Address(OLD)",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Combination Field: Username And Address And Logondomain",
+            "entityTypeId": "account",
+            "id": "comb_username_address_logondomain",
+            "name": "Username+Address+LogonDomain",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Combination Field: Username And Address And Platformid",
+            "entityTypeId": "account",
+            "id": "comb_username_address_platform",
+            "name": "Username+Address+PlatformID",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Account's port property",
+            "entityTypeId": "account",
+            "id": "port",
+            "name": "Port",
+            "type": "string"
+        },
+        {
+            "archived": false,
+            "description": "Combination Field: Username And Address",
+            "entityTypeId": "account",
+            "id": "comb_username_address",
+            "name": "Username+Address",
+            "type": "string"
+        }
+    ],
+    "entityTypes": [
+        {
+            "anonymized": false,
+            "icon": "person",
+            "id": "vault_user",
+            "plural": "Vault Users",
+            "singular": "Vault User"
+        },
+        {
+            "anonymized": false,
+            "icon": "group",
+            "id": "vault_group",
+            "plural": "Vault Groups",
+            "singular": "Vault Group"
+        },
+        {
+            "anonymized": false,
+            "icon": "vpn_key",
+            "id": "vault_authorization",
+            "plural": "Vault Authorizations",
+            "singular": "Vault Authorization"
+        },
+        {
+            "anonymized": false,
+            "icon": "lock_person",
+            "id": "safe_permission",
+            "plural": "Safe Permissions",
+            "singular": "Safe Permission"
+        },
+        {
+            "anonymized": false,
+            "icon": "storage",
+            "id": "safe",
+            "plural": "Safes",
+            "singular": "Safe"
+        },
+        {
+            "anonymized": false,
+            "icon": "lock_open",
+            "id": "account",
+            "plural": "Accounts",
+            "singular": "Account"
+        },
+        {
+            "anonymized": false,
+            "icon": "description",
+            "id": "platform",
+            "plural": "Platforms",
+            "singular": "Platform"
+        }
+    ],
+    "relationshipAttributeTypes": [
+        {
+            "archived": false,
+            "childType": "safe_permission",
+            "description": "If this safe member permission has an expiration date set",
+            "id": "has_expiration_date",
+            "name": "Has Expiration Date",
+            "parentType": "vault_user",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "childType": "safe_permission",
+            "description": "If this safe member permission has an expiration date set",
+            "id": "has_expiration_date",
+            "name": "Has Expiration Date",
+            "parentType": "vault_group",
+            "type": "boolean"
+        },
+        {
+            "archived": false,
+            "childType": "safe_permission",
+            "description": "Date and time the safe membership expires",
+            "id": "expiration_date",
+            "name": "Expiration Date",
+            "parentType": "vault_user",
+            "type": "dateTime"
+        },
+        {
+            "archived": false,
+            "childType": "safe_permission",
+            "description": "Date and time the safe membership expires",
+            "id": "expiration_date",
+            "name": "Expiration Date",
+            "parentType": "vault_group",
+            "type": "dateTime"
+        }
+    ],
+    "relationshipTypes": [
+        {
+            "fromEntityTypeId": "vault_user",
+            "id": 184,
+            "toEntityTypeId": "vault_group"
+        },
+        {
+            "fromEntityTypeId": "vault_user",
+            "id": 185,
+            "toEntityTypeId": "vault_authorization"
+        },
+        {
+            "fromEntityTypeId": "vault_user",
+            "id": 186,
+            "toEntityTypeId": "safe_permission"
+        },
+        {
+            "fromEntityTypeId": "vault_group",
+            "id": 187,
+            "toEntityTypeId": "safe_permission"
+        },
+        {
+            "fromEntityTypeId": "safe_permission",
+            "id": 188,
+            "toEntityTypeId": "safe"
+        },
+        {
+            "fromEntityTypeId": "safe",
+            "id": 189,
+            "toEntityTypeId": "account"
+        },
+        {
+            "fromEntityTypeId": "platform",
+            "id": 190,
+            "toEntityTypeId": "account"
+        }
+    ]
+}
