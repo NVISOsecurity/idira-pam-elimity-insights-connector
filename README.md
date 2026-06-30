@@ -4,16 +4,17 @@ Script to retrieve data from a Idira PAM (formerly CyberArk Privileged Access Ma
 
 ## PAM environment types
 
-This script can read information from PAM Self-Hosted environments (Vault is hosted in its own VM or server) or Privilege Cloud ISPSS (Palo Alto Idira hosts the PAM environment).
+This script reads information from PAM Self-Hosted environments (Vault is hosted in its own VM or server) or Privilege Cloud ISPSS (Palo Alto Idira hosts the PAM environment).
 It was tested with PAM Self-Hosted v15.0 and Privilege Cloud ISPSS v14.9.
 
 The *old* PrivCloud "Standard" infrastructure is not supported by this script.
 
 ## Prerequisites - Elimity Insights
 
-Create a new source in Elimity Insights, add import the data model from the `.json` file in the "Elimity-Source-Data-Model" directory.
-
-Generate API credentials for this source, and set the source id and secret in the ".env" file.
+1. Create a new source in Elimity Insights using the "Custom" preset
+2. Import the data model from the `.json` file in the "Elimity-Source-Data-Model" directory.
+3. Generate API credentials for this source
+4. Set the source id and secret in the ".env" file.
 
 ## Prerequisites - Idira PAM
 
