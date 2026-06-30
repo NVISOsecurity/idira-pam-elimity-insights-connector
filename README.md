@@ -18,12 +18,12 @@ The *old* PrivCloud "Standard" infrastructure is not supported by this script.
 
 ## Prerequisites - Idira PAM
 
-Create a user in your PAM environment to read safe, account, user, and group information.
+Create a user in your PAM environment to read safe, account, platform, user, and group information.
 This user must be using password authentication.
 
 ### PAM Self-Hosted
 
-1. Create a Vault user with password authentication,
+1. Create a Vault user with password authentication
 2. Give it the "Audit Users" authorization
 3. Either
     1. Add it to the "Auditors" group to see all accounts, or
@@ -41,7 +41,7 @@ This user must be using password authentication.
 
 ## .env file creation - for providing environment configuration and credentials
 
-Rename the `.env.example` file to `.env`, and uncomment the variables in *either* the "Idira PAM Configuration Variables" section or the "Idira Privilege Cloud Variables" section.
+Rename the `.env.example` file to `.env`, and uncomment the variables in *either* the "Idira PAM Configuration Variables" section or the "Idira Privilege Cloud Configuration Variables" section.
 
 Fill out the credential information with the user details you created in PAM / PrivCloud and the Elimity source information.
 
