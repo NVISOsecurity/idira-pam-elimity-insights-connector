@@ -1,6 +1,8 @@
 # Palo Alto Idira PAM (formerly CyberArk PAM) Elimity Insights Connector
 
-Script to retrieve data from a Idira PAM (formerly CyberArk Privileged Access Manager) environment and upload it to [Elimity Insights](https://elimity.com/)
+Script to retrieve data from an Idira PAM (formerly CyberArk Privileged Access Manager) environment and upload it to [Elimity Insights](https://elimity.com/).
+
+It was developed at [NVISO](https://nviso.eu/) by [@bbrueckler](https://github.com/bbrueckler) to assist in detecting account-related risks during identity security risk assessments, and might be useful for organizations using both Idira PAM (formerly CyberArk PAM) **and** Elimity Insights.
 
 ## PAM environment types
 
@@ -18,9 +20,9 @@ Fill out the credential information with the user details you created in PAM / P
 ## Prerequisites - Elimity Insights
 
 1. Create a new source in Elimity Insights using the "Custom" preset
-2. Import the data model from the `.json` file in the "Elimity-Source-Data-Model" directory
+2. Import the data model from the `.json` file in the `Elimity-Source-Data-Model` directory
 3. In the source under "Settings > Elimity Insights API credentials", generate API credentials for this source
-4. Set the source id and secret in the ".env" file
+4. Set the source id and secret in the `.env` file
 
 ## Prerequisites - Idira PAM
 
@@ -34,7 +36,7 @@ This user must be using password authentication.
 3. Either
     1. Add it to the "Auditors" group to see all accounts, or
     2. Add it to individual safes with the "List Accounts" permission
-4. Set the URL and API credentials in the ".env" file
+4. Set the URL and API credentials in the `.env` file
 
 ### PrivCloud ISPSS
 
@@ -43,7 +45,7 @@ This user must be using password authentication.
 3. Either
     1. Add it to the "Privilege Cloud Auditors" role, or
     2. Add it to a role to enable PrivCloud login, and add it to individual safes with the "List Accounts" permission
-4. Set the URL and API credentials in the ".env" file
+4. Set the URL and API credentials in the `.env` file
 
 ## Run using `uv`
 
@@ -55,7 +57,7 @@ This user must be using password authentication.
 uv run upload-pam-data-to-elimity.py
 ```
 
-If you encounter an issue, check the script's logs in the `logs/` directory.
+If you encounter an issue, set the `IDIRA_PAM_LOGFILE_LOG_LEVEL` variable in `.env` to `"DEBUG"`, run the script again, and check the script's logs in the `logs/` directory.
 
 ## Collected Data
 

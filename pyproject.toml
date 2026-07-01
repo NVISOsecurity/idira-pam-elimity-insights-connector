@@ -1,7 +1,7 @@
 [project]
-name = "cyberark-pam-elimity-insights-connector"
+name = "idira-pam-elimity-insights-connector"
 version = "0.6.0"
-description = "Connector to upload data from a Idira PAM (formerly CyberArk PAM) environment to Elimity Insights"
+description = "Connector to upload data from an Idira PAM (formerly CyberArk PAM) environment to Elimity Insights"
 authors = [
     {name = "Bernhard Brueckler",email = "bernhard.brueckler@nviso.eu"}
 ]

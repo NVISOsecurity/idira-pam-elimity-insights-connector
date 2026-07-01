@@ -28,6 +28,8 @@ from elimity_insights_client import (
 # Timeout (in seconds) for all HTTP requests to avoid hanging indefinitely
 REQUEST_TIMEOUT = 60
 
+logger = logging.getLogger(__name__)
+
 
 def _safe_fromtimestamp(value, divisor=1) -> DateTimeValue | None:
     """Convert a numeric timestamp (or numeric-string) into Elimity DateTimeValue safely.
@@ -68,7 +70,7 @@ def get_required_env_vars(*var_names):
     values = []
     for var in var_names:
         value = getenv(var)
-        logger.debug(f"get_required_env_vars: Loading environment variable - '{var}'")
+        logger.debug("get_required_env_vars: Loading environment variable - '%s'", var)
         if value is None:
             raise ValueError(f"Required environment variable '{var}' is not defined.")
         values.append(value)
@@ -127,7 +129,7 @@ def logoff(env_type, api_base, session_token, verify_ssl=True):
     # If the target PAM environment is PrivCloud ISPSS, do nothing
     if env_type == "PRIVCLOUD_ISPSS":
         logger.debug("PrivCloud ISPSS does not seem to have a documented 'Logoff' function - doing nothing.")
-        # ISPSS doesn't seem to have a dedicated "log out my session" functionality (since the session tokens expire after 15 minutes by default), so nothing is implemented here.
+        # ISPSS does not seem to have a dedicated "log out my session" functionality (since the session tokens expire after 15 minutes by default), so nothing is implemented here.
         return
 
     # If the target PAM environment is PAM Self-Hosted, log off via the dedicated API method
@@ -225,7 +227,7 @@ def get_safe_members(pvwa_url, session_token, safeUrlId, verify_ssl=True):
 
 def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_ssl=True):
     """Get all accounts in a given safe and return them as a list."""
-    logger.debug(f"get_accounts_per_safe: safeUrlId = {safeUrlId}")
+    logger.debug("get_accounts_per_safe: safeUrlId = %s", safeUrlId)
     batch_size: int = 100
 
     if env_type == "PRIVCLOUD_ISPSS":
@@ -253,9 +255,9 @@ def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_s
 
     while True:
         logger.debug("get_accounts_per_safe: Sending request")
-        logger.debug(f"get_accounts_per_safe: URL = {pvwa_url}/{next_link}")
+        logger.debug("get_accounts_per_safe: URL = %s/%s", pvwa_url, next_link)
         logger.debug("get_accounts_per_safe: headers present")
-        logger.debug(f"get_accounts_per_safe: verify = {verify_ssl}")
+        logger.debug("get_accounts_per_safe: verify = %s", verify_ssl)
 
         response = requests.get(
             f"{pvwa_url}/{next_link}",
@@ -280,9 +282,9 @@ def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_s
     return accounts_list
 
 
-def get_extended_account_details(pvwa_url, session_token, env_type, accountId, verify_ssl=True):
+def get_extended_account_details(pvwa_url, session_token, accountId, verify_ssl=True):
     """Get extended account details for a given account."""
-    logger.debug(f"get_extended_account_details: accountId = {accountId}")
+    logger.debug("get_extended_account_details: accountId = %s", accountId)
 
     headers = {
         "Authorization": f"{session_token}",
@@ -301,10 +303,10 @@ def get_extended_account_details(pvwa_url, session_token, env_type, accountId, v
             accountId,
             response.status_code,
         )
+        response.raise_for_status()
         return None
 
     response.raise_for_status()
-
     return response.json()
 
 
@@ -334,7 +336,7 @@ def get_vault_users(pvwa_url, session_token, verify_ssl=True):
     return response.json()["Users"]
 
 
-def get_vault_user_details(pvwa_url, session_token, env_type, user_id, verify_ssl=True):
+def get_vault_user_details(pvwa_url, session_token, user_id, verify_ssl=True):
     """Get details for a Vault user."""
     headers = {
         "Authorization": f"{session_token}",
@@ -390,38 +392,40 @@ def get_entity_by_name(name: str, entities: List[Entity]) -> Entity | None:
     return None
 
 
-logger = logging.getLogger(__name__)
+def parse_log_level(value: str | None) -> int | None:
+    """Parse the configured log level and default to INFO."""
+    normalized_value = str(value or "INFO").strip().upper()
+    supported_levels = {
+        "NONE": None,
+        "INFO": logging.INFO,
+        "DEBUG": logging.DEBUG,
+    }
+    if normalized_value not in supported_levels:
+        logger.warning("Unsupported IDIRA_PAM_LOGFILE_LOG_LEVEL '%s'; defaulting to INFO", value)
+        return logging.INFO
+    return supported_levels[normalized_value]
 
 
 def main():
     # Create and configure logger
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = f"logs/{timestamp}.log"
-    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    env_file = Path(".env")
 
     # Create log handlers
     console_handler = logging.StreamHandler()
-    # console_handler.setLevel(logging.DEBUG)
     console_handler.setLevel(logging.INFO)
-
-    file_handler = RotatingFileHandler(log_file, maxBytes=(10 * 1024 * 1024), backupCount=3)
-    file_handler.setLevel(logging.DEBUG)
 
     # Create formatters and add them to the handlers
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     console_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
 
     # Add handlers to the logger
     logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
 
-    env_file = Path(".env")
     if not env_file.is_file():
         logger.error(
-            f"⚠️  Required .env file not found at '{env_file.resolve()}! Rename the provided '.env.example' file to '.env' and fill in the required configuration variables. See the README for more details."
+            f"⚠️  Required .env file not found at '{env_file.resolve()}! Rename the provided '.env.example' file to '.env' and fill in the required configuration variables. See the README.md for more details."
         )
         sys.exit(1)
 
@@ -434,6 +438,23 @@ def main():
     # Load config variables from dotenv file
     logger.debug("Loading configuration variables from dotfile into environment")
     load_dotenv(dotenv_path=env_file, override=True)
+
+    log_level = parse_log_level(getenv("IDIRA_PAM_LOGFILE_LOG_LEVEL", "INFO"))
+
+    if log_level is None:
+        logger.setLevel(logging.INFO)
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = f"logs/{timestamp}.log"
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+
+        file_handler = RotatingFileHandler(log_file, maxBytes=(10 * 1024 * 1024), backupCount=3)
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        logger.setLevel(min(logging.INFO, log_level))
+        logger.debug("Configured log level to %s", logging.getLevelName(log_level))
 
     (
         idira_pam_env_type,
@@ -457,13 +478,13 @@ def main():
         "ELIMITY_UPLOAD_API_SECRET",
     )
     elimity_verify_ssl = getenv("ELIMITY_VERIFY_SSL", "True")
-    cyberark_verify_ssl = getenv("IDIRA_PAM_VERIFY_SSL", "True")
+    idira_pam_verify_ssl = getenv("IDIRA_PAM_VERIFY_SSL", "True")
 
     def _str_to_bool(v: str) -> bool:
         """Parse boolean-like environment values."""
         return str(v).strip().lower() in ("1", "true", "yes", "y")
 
-    cyberark_verify_ssl = _str_to_bool(cyberark_verify_ssl)
+    idira_pam_verify_ssl = _str_to_bool(idira_pam_verify_ssl)
     elimity_verify_ssl = _str_to_bool(elimity_verify_ssl)
 
     cyberark_safes_to_skip = getenv(
@@ -479,7 +500,7 @@ def main():
         idira_pam_api_base,
         idira_pam_username,
         idira_pam_password,
-        cyberark_verify_ssl,
+        idira_pam_verify_ssl,
     )
     logger.info("✅ Authenticated to Idira PAM environment successfully")
 
@@ -501,13 +522,13 @@ def main():
 
     safes_to_skip_patterns: List[str] = [element.strip() for element in cyberark_safes_to_skip.split(",") if element.strip()]
 
-    logger.debug(f"Safe skip patterns = {safes_to_skip_patterns}")
+    logger.debug("Safe skip patterns = %s", safes_to_skip_patterns)
 
     # Parse additional account properties to retrieve (comma-separated)
     additional_account_properties_env = getenv("IDIRA_PAM_ADDITIONAL_ACCOUNT_PROPERTIES_TO_RETRIEVE", "")
     additional_account_properties: List[str] = [p.strip() for p in additional_account_properties_env.split(",") if p.strip()]
 
-    logger.debug(f"Additional account properties to retrieve = {additional_account_properties}")
+    logger.debug("Additional account properties to retrieve = %s", additional_account_properties)
 
     # List of all safe permissions that Elimity should parse
     #  "name": The display name of the permissions as it will appear in the Elimity UI
@@ -603,23 +624,23 @@ def main():
     platform_to_account_relationships: List[Relationship] = []
 
     # Retrieve platforms
-    platforms = get_platforms(pvwa_url, session_token, verify_ssl=True)
+    platforms = get_platforms(pvwa_url, session_token, idira_pam_verify_ssl)
     logger.info(f"📑 Retrieved {len(platforms)} Platforms via Idira PAM REST API")
     logger.debug(pformat(platforms))
 
     # Retrieve safes
-    safes = get_safes(pvwa_url, session_token, verify_ssl=True)
+    safes = get_safes(pvwa_url, session_token, idira_pam_verify_ssl)
     safes = sorted(safes, key=lambda safe: safe.get("safeName", "").lower())
     logger.info(f"📦 Retrieved {len(safes)} Safes via Idira PAM REST API")
     logger.debug(pformat(safes))
 
     # Retrieve vault users
-    vault_users = get_vault_users(pvwa_url, session_token, verify_ssl=True)
+    vault_users = get_vault_users(pvwa_url, session_token, idira_pam_verify_ssl)
     logger.info(f"👤 Retrieved {len(vault_users)} Users via Idira PAM REST API")
     logger.debug(pformat(vault_users))
 
     # Retrieve vault groups
-    vault_groups = get_vault_groups(pvwa_url, session_token, verify_ssl=True)
+    vault_groups = get_vault_groups(pvwa_url, session_token, idira_pam_verify_ssl)
     logger.info(f"👥 Retrieved {len(vault_groups)} Groups via Idira PAM REST API")
     logger.debug(pformat(vault_groups))
 
@@ -632,7 +653,11 @@ def main():
     # This loop creates "Vault Authorization" entities in Elimity (for example for the "Add/Update Users" authorization) that Vault user entities will later
     # be linked to.
     for vault_authz in vault_authorizations_to_add:
-        logger.debug(f"Creating Vault Authorization entity: ID {vault_authz['internal_name']}, Name {vault_authz['name']}")
+        logger.debug(
+            "Creating Vault Authorization entity: ID %s, Name %s",
+            vault_authz["internal_name"],
+            vault_authz["name"],
+        )
         vault_authorizations_entities.append(
             Entity(
                 id=vault_authz["internal_name"],
@@ -649,7 +674,7 @@ def main():
     logger.info("🔄 Starting platforms loop")
 
     for platform in platforms:
-        logger.debug(f"Handling platform name {platform['general']['name']}, ID {platform['general']['id']}")
+        logger.debug("Handling platform name %s, ID %s", platform["general"]["name"], platform["general"]["id"])
 
         platform_entity_attributes: List[AttributeAssignment] = [
             AttributeAssignment("allow_manual_change", BooleanValue(platform["credentialsManagement"]["allowManualChange"])),
@@ -704,15 +729,14 @@ def main():
     logger.info("🔄 Starting users loop")
 
     for user in vault_users:
-        logger.debug(f"Handling user name {user['username']}, ID {user['id']}")
+        logger.debug("Handling user name %s, ID %s", user["username"], user["id"])
 
-        logger.debug(f"Getting user details for user ID {user['id']}")
+        logger.debug("Getting user details for user ID %s", user["id"])
         user_details = get_vault_user_details(
             pvwa_url,
             session_token,
-            idira_pam_env_type,
             user["id"],
-            verify_ssl=True,
+            idira_pam_verify_ssl,
         )
 
         vault_user_entity_attributes: List[AttributeAssignment] = [
@@ -749,7 +773,7 @@ def main():
 
         for vault_authz in vault_authorizations_to_add:
             if vault_authz["internal_name"] in user["vaultAuthorization"]:
-                logger.debug(f"Linking user {user['username']} to Vault Authz {vault_authz['internal_name']}")
+                logger.debug("Linking user %s to Vault Authz %s", user["username"], vault_authz["internal_name"])
                 vault_user_to_vault_authorization_relationships.append(
                     Relationship(
                         from_entity_id=str(user["id"]),
@@ -767,7 +791,7 @@ def main():
     logger.info("🔄 Starting groups loop")
 
     for group in vault_groups:
-        logger.debug(f"Handling group name {group['groupName']}, ID {group['id']}")
+        logger.debug("Handling group name %s, ID %s", group["groupName"], group["id"])
 
         vault_group_entity_attributes: List[AttributeAssignment] = [
             AttributeAssignment("description", StringValue(group["description"])),
@@ -790,10 +814,10 @@ def main():
     logger.info("🔄 Starting groups->users loop")
 
     for group in vault_groups:
-        logger.debug(f"Handling group name {group['groupName']}, ID {group['id']}")
+        logger.debug("Handling group name %s, ID %s", group["groupName"], group["id"])
 
         for group_member in group["members"]:
-            logger.debug(f"Handling member ID {group_member['id']}")
+            logger.debug("Handling member ID %s", group_member["id"])
 
             # Check if the group member already exists in the vault_user_entities list - if
             #   not, add it. The match is done base on the principal name (username or group
@@ -810,7 +834,9 @@ def main():
             if matching_user is None:
                 # Group member does not exist in vault_users list
                 logger.debug(
-                    f"Group member ID {group_member['id']} Name {group_member['username']} doesnt exist in Vault User Entities list, adding it to list"
+                    "Group member ID %s Name %s does not exist in Vault User Entities list, adding it to list",
+                    group_member["id"],
+                    group_member["username"],
                 )
 
                 matching_user = Entity(
@@ -823,7 +849,7 @@ def main():
                 vault_user_entities.append(matching_user)
 
             # Group member now definitely exists in the vault_users list. Adding link between vault_user and vault_group entities.
-            logger.debug(f"Adding User->Group relationship: Group Member User ID {matching_user.id} --> Group ID {group['id']}")
+            logger.debug("Adding User->Group relationship: Group Member User ID %s --> Group ID %s", matching_user.id, group["id"])
             vault_user_to_vault_group_relationships.append(
                 Relationship(
                     from_entity_id=str(matching_user.id),
@@ -840,22 +866,22 @@ def main():
 
     logger.info("🔄 Starting safes loop")
     for safe in safes:
-        logger.debug(f"Handling safe name {safe['safeName']}")
+        logger.debug("Handling safe name %s", safe["safeName"])
         # Skip processing this safe if the name matches any configured pattern.
         if _matches_any_pattern(safe["safeName"], safes_to_skip_patterns):
             logger.info(f"  ⏩ {safe['safeName']:<30}[skipped]")
-            logger.debug(f"Safe {safe['safeName']} matched 'IDIRA_PAM_SAFES_TO_SKIP' pattern list - skipping")
+            logger.debug("Safe %s matched 'IDIRA_PAM_SAFES_TO_SKIP' pattern list - skipping", safe["safeName"])
             continue
 
         logger.info(f"  🗃️  {safe['safeName']}")
-        logger.debug(f"Creating safe permissions entities for safe: {safe['safeName']}")
+        logger.debug("Creating safe permissions entities for safe: %s", safe["safeName"])
 
         # This loop creates safe-specific "Safe Permission" entities in Elimity
         # (for example for the "List Accounts" permission) that Vault Users or
         # Groups will later be linked to, if they have that specific permission
         # on that specific safe.
         for safe_permission in safe_permissions_to_add:
-            logger.debug(f"Creating Safe Permission entity: ID {safe_permission['internal_name']} on Safe Name {safe['safeName']}")
+            logger.debug("Creating Safe Permission entity: ID %s on Safe Name %s", safe_permission["internal_name"], safe["safeName"])
 
             safe_permission_attribute_assignments: List[AttributeAssignment] = [
                 AttributeAssignment("safe_name", StringValue(safe["safeName"])),
@@ -871,7 +897,7 @@ def main():
                 )
             )
 
-            logger.debug(f"Linking Safe Permission to Safe: ID {safe_permission['internal_name']} --> Safe Name {safe['safeName']}")
+            logger.debug("Linking Safe Permission to Safe: ID %s --> Safe Name %s", safe_permission["internal_name"], safe["safeName"])
 
             safe_permission_to_safe_relationships.append(
                 Relationship(
@@ -894,12 +920,12 @@ def main():
         # In this case, we need to add that user to the vault users entities list
         #   (but without user details like first name, last name, email, enable status,
         #   authorizations; because we can't see those)
-        logger.debug(f"Checking if safe creator exists in vault users list - creator user id: {safe['creator']['name']}")
+        logger.debug("Checking if safe creator exists in vault users list - creator user id: %s", safe["creator"]["name"])
 
         matching_principal = get_entity_by_name(safe["creator"]["name"], vault_user_entities)
 
         if matching_principal is None:
-            logger.debug(f"User doesnt exist, adding to vault_users list - safe creator user name: {safe['creator']['name']}")
+            logger.debug("User does not exist, adding to vault_users list - safe creator user name: %s", safe["creator"]["name"])
             safe_creator_attribute_assignments: List[AttributeAssignment] = []
 
             matching_principal = Entity(
@@ -946,14 +972,14 @@ def main():
         ## Safe Member Loop                                                  ##
         #######################################################################
 
-        logger.debug(f"Handling safe members of safe {safe['safeName']}")
+        logger.debug("Handling safe members of safe %s", safe["safeName"])
 
         # Get Safe Members per Safe
-        safe_members = get_safe_members(pvwa_url, session_token, safe["safeUrlId"], verify_ssl=True)
+        safe_members = get_safe_members(pvwa_url, session_token, safe["safeUrlId"], idira_pam_verify_ssl)
 
-        logger.debug(f"Safe Members of Safe {safe['safeName']} = {pformat(safe_members)}")
+        logger.debug("Safe Members of Safe %s = %s", safe["safeName"], pformat(safe_members))
         for safeMember in safe_members:
-            logger.debug(f"Processing Safe Member: {safeMember['memberName']}")
+            logger.debug("Processing Safe Member: %s", safeMember["memberName"])
 
             if safeMember["memberType"] == "User":
                 # Check if a user with the same name as the safe member
@@ -961,7 +987,11 @@ def main():
                 matching_principal = get_entity_by_name(safeMember["memberName"], vault_user_entities)
 
                 if matching_principal is None:
-                    logger.debug(f"User doesnt exist, adding to vault_users list - safeMember ID: {safeMember['memberId']}, Name {safeMember['memberName']}")
+                    logger.debug(
+                        "User does not exist, adding to vault_users list - safeMember ID: %s, Name %s",
+                        safeMember["memberId"],
+                        safeMember["memberName"],
+                    )
                     safe_creator_attribute_assignments: List[AttributeAssignment] = []
 
                     matching_principal = Entity(
@@ -986,11 +1016,14 @@ def main():
                         vault_user_to_permission_relationship_attributes.append(AttributeAssignment("expiration_date", safe_member_membership_expiration_date))
 
                 for safe_permission in safe_permissions_to_add:
-                    logger.debug(f"Handling Safe Permission {safe_permission['internal_name']} on Safe Member {safeMember['memberName']}")
+                    logger.debug("Handling Safe Permission %s on Safe Member %s", safe_permission["internal_name"], safeMember["memberName"])
                     # Check if the current safe member has a certain permission on the current safe
                     if safeMember["permissions"][safe_permission["internal_name"]] is True:
                         logger.debug(
-                            f"Safe Permission {safe_permission['internal_name']} on Safe Member {safeMember['memberName']} is True for Safe Name {safe['safeName']}"
+                            "Safe Permission %s on Safe Member %s is True for Safe Name %s",
+                            safe_permission["internal_name"],
+                            safeMember["memberName"],
+                            safe["safeName"],
                         )
                         # If yes, add a link between the vault user and the safe permission
                         #   entities, but use the ID of the found user as the user
@@ -1008,7 +1041,10 @@ def main():
                         )
                     else:
                         logger.debug(
-                            f"Safe Permission {safe_permission['internal_name']} on Safe Member {safeMember['memberName']} is False for Safe Name {safe['safeName']}"
+                            "Safe Permission %s on Safe Member %s is False for Safe Name %s",
+                            safe_permission["internal_name"],
+                            safeMember["memberName"],
+                            safe["safeName"],
                         )
 
             if safeMember["memberType"] == "Group":
@@ -1017,7 +1053,11 @@ def main():
                 matching_principal = get_entity_by_name(safeMember["memberName"], vault_group_entities)
 
                 if matching_principal is None:
-                    logger.debug(f"Group doesnt exist, adding to vault_groups list - safeMember ID: {safeMember['memberId']}, Name {safeMember['memberName']}")
+                    logger.debug(
+                        "Group does not exist, adding to vault_groups list - safeMember ID: %s, Name %s",
+                        safeMember["memberId"],
+                        safeMember["memberName"],
+                    )
                     safe_creator_attribute_assignments: List[AttributeAssignment] = []
 
                     matching_principal = Entity(
@@ -1042,11 +1082,14 @@ def main():
                         vault_group_to_permission_relationship_attributes.append(AttributeAssignment("expiration_date", safe_member_membership_expiration_date))
 
                 for safe_permission in safe_permissions_to_add:
-                    logger.debug(f"Handling Safe Permission {safe_permission['internal_name']} on Safe Member {safeMember['memberName']}")
+                    logger.debug("Handling Safe Permission %s on Safe Member %s", safe_permission["internal_name"], safeMember["memberName"])
                     # Check if the current safe member has a certain permission on the current safe
                     if safeMember["permissions"][safe_permission["internal_name"]] is True:
                         logger.debug(
-                            f"Safe Permission {safe_permission['internal_name']} on Safe Member {safeMember['memberName']} is True for Safe Name {safe['safeName']}"
+                            "Safe Permission %s on Safe Member %s is True for Safe Name %s",
+                            safe_permission["internal_name"],
+                            safeMember["memberName"],
+                            safe["safeName"],
                         )
                         # If yes, add a link between the vault group and the safe permission
                         #   entities, but use the ID of the found group as the group
@@ -1064,7 +1107,10 @@ def main():
                         )
                     else:
                         logger.debug(
-                            f"Safe Permission {safe_permission['internal_name']} on Safe Member {safeMember['memberName']} is False for Safe Name {safe['safeName']}"
+                            "Safe Permission %s on Safe Member %s is False for Safe Name %s",
+                            safe_permission["internal_name"],
+                            safeMember["memberName"],
+                            safe["safeName"],
                         )
             # End safe permission loop
         # End safe member loop
@@ -1073,20 +1119,24 @@ def main():
         ## Accounts Loop                                                     ##
         #######################################################################
 
-        logger.debug(f"Handling accounts in safe {safe['safeName']}")
+        logger.debug("Handling accounts in safe %s", safe["safeName"])
 
         accounts = get_accounts_per_safe(
             pvwa_url,
             session_token,
             idira_pam_env_type,
             safe["safeUrlId"],
-            verify_ssl=True,
+            idira_pam_verify_ssl,
         )
 
-        logger.debug(f"Accounts in Safe {safe['safeName']} = {pformat(accounts)}")
+        logger.debug("Accounts in Safe %s = %s", safe["safeName"], pformat(accounts))
 
         for account in accounts:
-            logger.debug(f"Processing Account: {account.get('userName', '<EMPTY_USERNAME>')} on {account.get('address', '<EMPTY_ADDRESS>')}")
+            logger.debug(
+                "Processing Account: %s on %s",
+                account.get("userName", "<EMPTY_USERNAME>"),
+                account.get("address", "<EMPTY_ADDRESS>"),
+            )
 
             account_entity_attributes: List[AttributeAssignment] = [
                 AttributeAssignment("username", StringValue(account.get("userName", ""))),
@@ -1128,9 +1178,8 @@ def main():
             extended_account_details = get_extended_account_details(
                 pvwa_url,
                 session_token,
-                idira_pam_env_type,
                 account["id"],
-                verify_ssl=True,
+                idira_pam_verify_ssl,
             )
 
             if extended_account_details:
@@ -1200,7 +1249,7 @@ def main():
             )
 
             if account["platformId"]:
-                logger.debug(f"Linking accountId {account['id']} to platformId {account['platformId']}")
+                logger.debug("Linking accountId %s to platformId %s", account["id"], account["platformId"])
 
                 platform_to_account_relationship_attributes: List[AttributeAssignment] = []
                 platform_to_account_relationships.append(
@@ -1213,11 +1262,14 @@ def main():
                     )
                 )
             else:
-                logger.debug(f"Account accountId {account['id']} does not have a platform assigned - not creating a account->platform link")
+                logger.debug(
+                    "Account accountId %s does not have a platform assigned - not creating a account->platform link",
+                    account["id"],
+                )
         # End account loop
 
     # Log off from PVWA
-    logoff(idira_pam_env_type, idira_pam_api_base, session_token, verify_ssl=True)
+    logoff(idira_pam_env_type, idira_pam_api_base, session_token, idira_pam_verify_ssl)
 
     #######################################################################
     ## Entity Upload to Elimity                                          ##

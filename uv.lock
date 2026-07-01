@@ -117,23 +117,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cyberark-pam-elimity-insights-connector"
-version = "0.6.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "elimity-insights-client" },
-    { name = "python-dotenv" },
-    { name = "requests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "elimity-insights-client", specifier = ">=10.2.1,<11.0.0" },
-    { name = "python-dotenv", specifier = ">=1.2.2,<2.0.0" },
-    { name = "requests", specifier = ">=2.34.2,<3.0.0" },
-]
-
-[[package]]
 name = "elimity-insights-client"
 version = "10.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -147,6 +130,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/33/12/c33982be4c50c5a7b1e246532989a382576cc086169e85edd7851d7a184f/elimity_insights_client-10.2.1.tar.gz", hash = "sha256:8f3e1a0d74895744fc552a7bcf817f15daf49f997d85601d2b867bc47e003938", size = 20448, upload-time = "2025-05-19T09:12:37.27Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b0/8b/0f8f44de09ddcf3260b3cc50a1fae61df8ee1bddb882c3fe24be64124c65/elimity_insights_client-10.2.1-py3-none-any.whl", hash = "sha256:9e6339beeb8c89bb0e076695358af9fcfb9ba308c10a0338da57afc225b1b024", size = 27302, upload-time = "2025-05-19T09:12:36.375Z" },
+]
+
+[[package]]
+name = "idira-pam-elimity-insights-connector"
+version = "0.6.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "elimity-insights-client" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "elimity-insights-client", specifier = ">=10.2.1,<11.0.0" },
+    { name = "python-dotenv", specifier = ">=1.2.2,<2.0.0" },
+    { name = "requests", specifier = ">=2.34.2,<3.0.0" },
 ]
 
 [[package]]
