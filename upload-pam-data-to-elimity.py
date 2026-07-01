@@ -303,7 +303,6 @@ def get_extended_account_details(pvwa_url, session_token, accountId, verify_ssl=
             accountId,
             response.status_code,
         )
-        response.raise_for_status()
         return None
 
     response.raise_for_status()
