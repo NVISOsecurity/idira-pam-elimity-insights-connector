@@ -35,7 +35,7 @@ This user must be using password authentication.
 2. Give it the "Audit Users" authorization
 3. Either
     1. Add it to the "Auditors" group to see all accounts, or
-    2. Add it to individual safes with the "List Accounts" permission
+    2. Add it to individual safes with the "List Accounts" and "View Safe Members" permissions
 4. Set the URL and API credentials in the `.env` file
 
 ### PrivCloud ISPSS
@@ -44,7 +44,7 @@ This user must be using password authentication.
 2. Enable the "Is OAuth confidential client" property
 3. Either
     1. Add it to the "Privilege Cloud Auditors" role, or
-    2. Add it to a role to enable PrivCloud login, and add it to individual safes with the "List Accounts" permission
+    2. Add it to a role that enables PrivCloud login, and add it to individual safes with the "List Accounts" and "View Safe Members" permissions
 4. Set the URL and API credentials in the `.env` file
 
 ## Run using `uv`

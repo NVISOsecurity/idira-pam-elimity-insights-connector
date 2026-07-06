@@ -216,6 +216,12 @@ def get_safe_members(pvwa_url, session_token, safeUrlId, verify_ssl=True):
         verify=verify_ssl,
         timeout=REQUEST_TIMEOUT,
     )
+
+    if response.status_code == 403:
+        logger.warning("Failed to retrieve safe members for safe %s. Make sure the Vault API user has the 'View Safe Members' authorization.", safeUrlId)
+        logger.info("Continuing without safe members for safe %s. No safe member data will be uploaded to Elimity Insights for this safe.", safeUrlId)
+        return []
+
     response.raise_for_status()
     logger.debug(
         "Get Safe Members API response: status=%s, len=%d",
@@ -322,8 +328,9 @@ def get_vault_users(pvwa_url, session_token, verify_ssl=True):
     )
 
     if response.status_code == 403:
-        logger.error("Failed to retrieve Vault user list. Make sure the Vault API user has the 'Audit Users' authorization.")
-        sys.exit(1)
+        logger.warning("Failed to retrieve Vault user list. Make sure the Vault API user has the 'Audit Users' authorization.")
+        logger.info("Continuing without Vault users. No Vault user data will be uploaded to Elimity Insights.")
+        return []
 
     response.raise_for_status()
 
@@ -370,8 +377,9 @@ def get_vault_groups(pvwa_url, session_token, verify_ssl=True):
     )
 
     if response.status_code == 403:
-        logger.error("Failed to retrieve Vault groups list. Make sure the Vault API user has the 'Audit Users' authorization.")
-        sys.exit(1)
+        logger.warning("Failed to retrieve Vault groups list. Make sure the Vault API user has the 'Audit Users' authorization.")
+        logger.info("Continuing without Vault groups. No Vault group data will be uploaded to Elimity Insights.")
+        return []
 
     response.raise_for_status()
 
