@@ -28,6 +28,10 @@ from elimity_insights_client import (
 # Timeout (in seconds) for all HTTP requests to avoid hanging indefinitely
 REQUEST_TIMEOUT = 60
 
+# Default batch size for paginated API requests to avoid requesting too many
+#  entities in a single request (which would cause the API to time out or return an error)
+API_BATCH_SIZE = 100
+
 logger = logging.getLogger(__name__)
 
 
@@ -174,8 +178,8 @@ def get_platforms(pvwa_url, session_token, verify_ssl=True):
 
 def get_safes(pvwa_url, session_token, verify_ssl=True):
     """Retrieve all safes and return them as a list."""
-    batch_size: int = 100
-    next_link: str = f"api/Safes?limit={batch_size}&offset=0&useCache=False"
+    batch_size: int = API_BATCH_SIZE
+    next_link: str = f"api/Safes?limit={batch_size}&offset=0&useCache=True"
     safes_list: List = []
 
     headers = {
@@ -190,15 +194,19 @@ def get_safes(pvwa_url, session_token, verify_ssl=True):
             timeout=REQUEST_TIMEOUT,
         )
         response.raise_for_status()
-        logger.debug(
-            "Get Safes API response: status=%s, len=%d",
-            response.status_code,
-            len(response.text or ""),
-        )
-        safes_list = safes_list + response.json().get("value", [])
 
-        if "nextLink" in response.json():
-            next_link = response.json()["nextLink"]
+        response_data = response.json()
+        page_safes = response_data.get("value", [])
+        safes_list = safes_list + page_safes
+        logger.debug(
+            "Retrieved %d safes in this page (%d total retrieved; %d total reported by API)",
+            len(page_safes),
+            len(safes_list),
+            response_data["count"],
+        )
+
+        if "nextLink" in response_data:
+            next_link = response_data["nextLink"]
         else:
             break
 
@@ -218,23 +226,25 @@ def get_safe_members(pvwa_url, session_token, safeUrlId, verify_ssl=True):
     )
 
     if response.status_code == 403:
-        logger.warning("Failed to retrieve safe members for safe %s. Make sure the Vault API user has the 'View Safe Members' authorization.", safeUrlId)
-        logger.info("Continuing without safe members for safe %s. No safe member data will be uploaded to Elimity Insights for this safe.", safeUrlId)
+        logger.warning(
+            "Failed to retrieve safe members for safe %s. Make sure the Vault API user has the 'View Safe Members' authorization.",
+            safeUrlId,
+        )
+        logger.info(
+            "Continuing without safe members for safe %s. No safe member data will be uploaded to Elimity Insights for this safe.",
+            safeUrlId,
+        )
         return []
 
     response.raise_for_status()
-    logger.debug(
-        "Get Safe Members API response: status=%s, len=%d",
-        response.status_code,
-        len(response.text or ""),
-    )
+
     return response.json()["value"]
 
 
 def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_ssl=True):
     """Get all accounts in a given safe and return them as a list."""
     logger.debug("get_accounts_per_safe: safeUrlId = %s", safeUrlId)
-    batch_size: int = 100
+    batch_size: int = API_BATCH_SIZE
 
     if env_type == "PRIVCLOUD_ISPSS":
         # If the target PAM environment is PrivCloud ISPSS, use the safeUrlId parameter as is
@@ -272,16 +282,19 @@ def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_s
             timeout=REQUEST_TIMEOUT,
         )
         response.raise_for_status()
+
+        response_data = response.json()
+        page_accounts = response_data.get("value", [])
+        accounts_list = accounts_list + page_accounts
         logger.debug(
-            "get_accounts_per_safe: Get Accounts API response: status=%s, len=%d",
-            response.status_code,
-            len(response.text or ""),
+            "Retrieved %d accounts in this page (%d total retrieved; %d total reported by API)",
+            len(page_accounts),
+            len(accounts_list),
+            response_data["count"],
         )
 
-        accounts_list = accounts_list + response.json().get("value", [])
-
-        if "nextLink" in response.json():
-            next_link = response.json()["nextLink"]
+        if "nextLink" in response_data:
+            next_link = response_data["nextLink"]
         else:
             break
 
@@ -290,7 +303,6 @@ def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_s
 
 def get_extended_account_details(pvwa_url, session_token, accountId, verify_ssl=True):
     """Get extended account details for a given account."""
-    logger.debug("get_extended_account_details: accountId = %s", accountId)
 
     headers = {
         "Authorization": f"{session_token}",
@@ -317,29 +329,49 @@ def get_extended_account_details(pvwa_url, session_token, accountId, verify_ssl=
 
 def get_vault_users(pvwa_url, session_token, verify_ssl=True):
     """Get all Vault users and return them as a list."""
+    batch_size: int = API_BATCH_SIZE
+    offset = 0
+    users_list: List = []
+    total_users = None
+
     headers = {
         "Authorization": f"{session_token}",
     }
-    response = requests.get(
-        f"{pvwa_url}/api/Users?ExtendedDetails=true",
-        headers=headers,
-        verify=verify_ssl,
-        timeout=REQUEST_TIMEOUT,
-    )
 
-    if response.status_code == 403:
-        logger.warning("Failed to retrieve Vault user list. Make sure the Vault API user has the 'Audit Users' authorization.")
-        logger.info("Continuing without Vault users. No Vault user data will be uploaded to Elimity Insights.")
-        return []
+    while total_users is None or len(users_list) < total_users:
+        response = requests.get(
+            f"{pvwa_url}/api/Users?pageSize={batch_size}&pageOffset={offset}&ExtendedDetails=true",
+            headers=headers,
+            verify=verify_ssl,
+            timeout=REQUEST_TIMEOUT,
+        )
+        if response.status_code == 403:
+            logger.warning("Failed to retrieve Vault user list. Make sure the Vault API user has the 'Audit Users' authorization.")
+            logger.info("Continuing without Vault users. No Vault user data will be uploaded to Elimity Insights.")
+            return []
 
-    response.raise_for_status()
+        response.raise_for_status()
 
-    logger.debug(
-        "Get Users API response: status=%s, len=%d",
-        response.status_code,
-        len(response.text or ""),
-    )
-    return response.json()["Users"]
+        response_data = response.json()
+        page_users = response_data["Users"]
+        users_list.extend(page_users)
+        total_users = response_data["Total"]
+        logger.debug(
+            "Retrieved %d Vault users in this page (%d total retrieved; %d total reported by API)",
+            len(page_users),
+            len(users_list),
+            total_users,
+        )
+        offset = len(users_list)
+
+    unique_users: List = []
+    seen_user_ids = set()
+    for user in users_list:
+        if user["id"] not in seen_user_ids:
+            seen_user_ids.add(user["id"])
+            unique_users.append(user)
+
+    return unique_users
 
 
 def get_vault_user_details(pvwa_url, session_token, user_id, verify_ssl=True):
@@ -356,11 +388,6 @@ def get_vault_user_details(pvwa_url, session_token, user_id, verify_ssl=True):
 
     response.raise_for_status()
 
-    logger.debug(
-        "Get Vault User Details API response: status=%s, len=%d",
-        response.status_code,
-        len(response.text or ""),
-    )
     return response.json()
 
 
@@ -384,10 +411,10 @@ def get_vault_groups(pvwa_url, session_token, verify_ssl=True):
     response.raise_for_status()
 
     logger.debug(
-        "Get Groups API response: status=%s, len=%d",
-        response.status_code,
-        len(response.text or ""),
+        "Response: %s",
+        response.text,
     )
+
     return response.json()["value"]
 
 
@@ -631,22 +658,27 @@ def main():
     platform_to_account_relationships: List[Relationship] = []
 
     # Retrieve platforms
+    logger.debug("Retrieving platforms via Idira PAM REST API")
     platforms = get_platforms(pvwa_url, session_token, idira_pam_verify_ssl)
     logger.info(f"📑 Retrieved {len(platforms)} Platforms via Idira PAM REST API")
     logger.debug(pformat(platforms))
 
     # Retrieve safes
+    logger.debug("Retrieving safes via Idira PAM REST API")
     safes = get_safes(pvwa_url, session_token, idira_pam_verify_ssl)
     safes = sorted(safes, key=lambda safe: safe.get("safeName", "").lower())
     logger.info(f"📦 Retrieved {len(safes)} Safes via Idira PAM REST API")
     logger.debug(pformat(safes))
 
     # Retrieve vault users
+    logger.debug("Retrieving Vault users via Idira PAM REST API")
     vault_users = get_vault_users(pvwa_url, session_token, idira_pam_verify_ssl)
+
     logger.info(f"👤 Retrieved {len(vault_users)} Users via Idira PAM REST API")
     logger.debug(pformat(vault_users))
 
     # Retrieve vault groups
+    logger.debug("Retrieving Vault groups via Idira PAM REST API")
     vault_groups = get_vault_groups(pvwa_url, session_token, idira_pam_verify_ssl)
     logger.info(f"👥 Retrieved {len(vault_groups)} Groups via Idira PAM REST API")
     logger.debug(pformat(vault_groups))
@@ -681,21 +713,50 @@ def main():
     logger.info("🔄 Starting platforms loop")
 
     for platform in platforms:
-        logger.debug("Handling platform name %s, ID %s", platform["general"]["name"], platform["general"]["id"])
+        logger.debug(
+            "Handling platform name %s, ID %s",
+            platform["general"]["name"],
+            platform["general"]["id"],
+        )
 
         platform_entity_attributes: List[AttributeAssignment] = [
-            AttributeAssignment("allow_manual_change", BooleanValue(platform["credentialsManagement"]["allowManualChange"])),
-            AttributeAssignment("allow_manual_reconciliation", BooleanValue(platform["credentialsManagement"]["allowManualReconciliation"])),
-            AttributeAssignment("allow_manual_verification", BooleanValue(platform["credentialsManagement"]["allowManualVerification"])),
-            AttributeAssignment("allowed_safes", StringValue(platform["credentialsManagement"]["allowedSafes"])),
-            AttributeAssignment("automatic_reconciliation_when_unsynched", BooleanValue(platform["credentialsManagement"]["automaticReconcileWhenUnsynched"])),
+            AttributeAssignment(
+                "allow_manual_change",
+                BooleanValue(platform["credentialsManagement"]["allowManualChange"]),
+            ),
+            AttributeAssignment(
+                "allow_manual_reconciliation",
+                BooleanValue(platform["credentialsManagement"]["allowManualReconciliation"]),
+            ),
+            AttributeAssignment(
+                "allow_manual_verification",
+                BooleanValue(platform["credentialsManagement"]["allowManualVerification"]),
+            ),
+            AttributeAssignment(
+                "allowed_safes",
+                StringValue(platform["credentialsManagement"]["allowedSafes"]),
+            ),
+            AttributeAssignment(
+                "automatic_reconciliation_when_unsynched",
+                BooleanValue(platform["credentialsManagement"]["automaticReconcileWhenUnsynched"]),
+            ),
             AttributeAssignment("description", StringValue(platform["general"]["description"])),
             AttributeAssignment("is_active", BooleanValue(platform["general"]["active"])),
-            AttributeAssignment("perform_periodic_change", BooleanValue(platform["credentialsManagement"]["performPeriodicChange"])),
-            AttributeAssignment("perform_periodic_verification", BooleanValue(platform["credentialsManagement"]["performPeriodicVerification"])),
-            AttributeAssignment("require_password_change_every_x_days", NumberValue(platform["credentialsManagement"]["requirePasswordChangeEveryXDays"])),
             AttributeAssignment(
-                "require_password_verification_every_x_days", NumberValue(platform["credentialsManagement"]["requirePasswordVerificationEveryXDays"])
+                "perform_periodic_change",
+                BooleanValue(platform["credentialsManagement"]["performPeriodicChange"]),
+            ),
+            AttributeAssignment(
+                "perform_periodic_verification",
+                BooleanValue(platform["credentialsManagement"]["performPeriodicVerification"]),
+            ),
+            AttributeAssignment(
+                "require_password_change_every_x_days",
+                NumberValue(platform["credentialsManagement"]["requirePasswordChangeEveryXDays"]),
+            ),
+            AttributeAssignment(
+                "require_password_verification_every_x_days",
+                NumberValue(platform["credentialsManagement"]["requirePasswordVerificationEveryXDays"]),
             ),
             AttributeAssignment(
                 "require_dual_control_password_access_approval",
@@ -706,13 +767,21 @@ def main():
                 BooleanValue(platform.get("privilegedAccessWorkflows", {}).get("enforceCheckinCheckoutExclusiveAccess", None)),
             ),
             AttributeAssignment(
-                "enforce_one_time_password_access", BooleanValue(platform.get("privilegedAccessWorkflows", {}).get("enforceOnetimePasswordAccess", None))
+                "enforce_one_time_password_access",
+                BooleanValue(platform.get("privilegedAccessWorkflows", {}).get("enforceOnetimePasswordAccess", None)),
             ),
             # Using "Title Case" for platform type to make it more readable in Elimity UI (for example, "Regular" instead of "regular")
-            AttributeAssignment("platform_type", StringValue(platform["general"]["platformType"].title())),
-            AttributeAssignment("psm_server_id", StringValue(platform.get("sessionManagement", {}).get("PSMServerID", None))),
             AttributeAssignment(
-                "record_and_save_session_activity", BooleanValue(platform.get("sessionManagement", {}).get("recordAndSaveSessionActivity", None))
+                "platform_type",
+                StringValue(platform["general"]["platformType"].title()),
+            ),
+            AttributeAssignment(
+                "psm_server_id",
+                StringValue(platform.get("sessionManagement", {}).get("PSMServerID", None)),
+            ),
+            AttributeAssignment(
+                "record_and_save_session_activity",
+                BooleanValue(platform.get("sessionManagement", {}).get("recordAndSaveSessionActivity", None)),
             ),
             AttributeAssignment(
                 "require_privileged_session_management_and_isolation",
@@ -738,6 +807,15 @@ def main():
     for user in vault_users:
         logger.debug("Handling user name %s, ID %s", user["username"], user["id"])
 
+        if user["id"] == 0:
+            logger.debug(
+                "Skipping user name %s, ID: %s - because user details typically cannot be retrieved via REST API.",
+                user["username"],
+                user["id"],
+            )
+
+            continue
+
         logger.debug("Getting user details for user ID %s", user["id"])
         user_details = get_vault_user_details(
             pvwa_url,
@@ -759,8 +837,14 @@ def main():
             AttributeAssignment("location", StringValue(user["location"])),
             AttributeAssignment("is_component_user", BooleanValue(user["componentUser"])),
             # Extended user details
-            AttributeAssignment("password_never_expires", BooleanValue(user_details["passwordNeverExpires"])),
-            AttributeAssignment("change_pass_on_next_logon", BooleanValue(user_details["changePassOnNextLogon"])),
+            AttributeAssignment(
+                "password_never_expires",
+                BooleanValue(user_details["passwordNeverExpires"]),
+            ),
+            AttributeAssignment(
+                "change_pass_on_next_logon",
+                BooleanValue(user_details["changePassOnNextLogon"]),
+            ),
             AttributeAssignment("distinguished_name", StringValue(user_details["distinguishedName"])),
             AttributeAssignment("description", StringValue(user_details["description"])),
             AttributeAssignment("business_email", StringValue(user_details["internet"]["businessEmail"])),
@@ -780,7 +864,11 @@ def main():
 
         for vault_authz in vault_authorizations_to_add:
             if vault_authz["internal_name"] in user["vaultAuthorization"]:
-                logger.debug("Linking user %s to Vault Authz %s", user["username"], vault_authz["internal_name"])
+                logger.debug(
+                    "Linking user %s to Vault Authz %s",
+                    user["username"],
+                    vault_authz["internal_name"],
+                )
                 vault_user_to_vault_authorization_relationships.append(
                     Relationship(
                         from_entity_id=str(user["id"]),
@@ -856,7 +944,11 @@ def main():
                 vault_user_entities.append(matching_user)
 
             # Group member now definitely exists in the vault_users list. Adding link between vault_user and vault_group entities.
-            logger.debug("Adding User->Group relationship: Group Member User ID %s --> Group ID %s", matching_user.id, group["id"])
+            logger.debug(
+                "Adding User->Group relationship: Group Member User ID %s --> Group ID %s",
+                matching_user.id,
+                group["id"],
+            )
             vault_user_to_vault_group_relationships.append(
                 Relationship(
                     from_entity_id=str(matching_user.id),
@@ -877,7 +969,10 @@ def main():
         # Skip processing this safe if the name matches any configured pattern.
         if _matches_any_pattern(safe["safeName"], safes_to_skip_patterns):
             logger.info(f"  ⏩ {safe['safeName']:<30}[skipped]")
-            logger.debug("Safe %s matched 'IDIRA_PAM_SAFES_TO_SKIP' pattern list - skipping", safe["safeName"])
+            logger.debug(
+                "Safe %s matched 'IDIRA_PAM_SAFES_TO_SKIP' pattern list - skipping",
+                safe["safeName"],
+            )
             continue
 
         logger.info(f"  🗃️  {safe['safeName']}")
@@ -888,7 +983,11 @@ def main():
         # Groups will later be linked to, if they have that specific permission
         # on that specific safe.
         for safe_permission in safe_permissions_to_add:
-            logger.debug("Creating Safe Permission entity: ID %s on Safe Name %s", safe_permission["internal_name"], safe["safeName"])
+            logger.debug(
+                "Creating Safe Permission entity: ID %s on Safe Name %s",
+                safe_permission["internal_name"],
+                safe["safeName"],
+            )
 
             safe_permission_attribute_assignments: List[AttributeAssignment] = [
                 AttributeAssignment("safe_name", StringValue(safe["safeName"])),
@@ -904,7 +1003,11 @@ def main():
                 )
             )
 
-            logger.debug("Linking Safe Permission to Safe: ID %s --> Safe Name %s", safe_permission["internal_name"], safe["safeName"])
+            logger.debug(
+                "Linking Safe Permission to Safe: ID %s --> Safe Name %s",
+                safe_permission["internal_name"],
+                safe["safeName"],
+            )
 
             safe_permission_to_safe_relationships.append(
                 Relationship(
@@ -927,12 +1030,18 @@ def main():
         # In this case, we need to add that user to the vault users entities list
         #   (but without user details like first name, last name, email, enable status,
         #   authorizations; because we can't see those)
-        logger.debug("Checking if safe creator exists in vault users list - creator user id: %s", safe["creator"]["name"])
+        logger.debug(
+            "Checking if safe creator exists in vault users list - creator user id: %s",
+            safe["creator"]["name"],
+        )
 
         matching_principal = get_entity_by_name(safe["creator"]["name"], vault_user_entities)
 
         if matching_principal is None:
-            logger.debug("User does not exist, adding to vault_users list - safe creator user name: %s", safe["creator"]["name"])
+            logger.debug(
+                "User does not exist, adding to vault_users list - safe creator user name: %s",
+                safe["creator"]["name"],
+            )
             safe_creator_attribute_assignments: List[AttributeAssignment] = []
 
             matching_principal = Entity(
@@ -1020,10 +1129,19 @@ def main():
 
                 if safeMember["isExpiredMembershipEnable"]:
                     if (safe_member_membership_expiration_date := _safe_fromtimestamp(safe.get("membershipExpirationDate"))) is not None:
-                        vault_user_to_permission_relationship_attributes.append(AttributeAssignment("expiration_date", safe_member_membership_expiration_date))
+                        vault_user_to_permission_relationship_attributes.append(
+                            AttributeAssignment(
+                                "expiration_date",
+                                safe_member_membership_expiration_date,
+                            )
+                        )
 
                 for safe_permission in safe_permissions_to_add:
-                    logger.debug("Handling Safe Permission %s on Safe Member %s", safe_permission["internal_name"], safeMember["memberName"])
+                    logger.debug(
+                        "Handling Safe Permission %s on Safe Member %s",
+                        safe_permission["internal_name"],
+                        safeMember["memberName"],
+                    )
                     # Check if the current safe member has a certain permission on the current safe
                     if safeMember["permissions"][safe_permission["internal_name"]] is True:
                         logger.debug(
@@ -1086,10 +1204,19 @@ def main():
 
                 if safeMember["isExpiredMembershipEnable"]:
                     if (safe_member_membership_expiration_date := _safe_fromtimestamp(safe.get("membershipExpirationDate"))) is not None:
-                        vault_group_to_permission_relationship_attributes.append(AttributeAssignment("expiration_date", safe_member_membership_expiration_date))
+                        vault_group_to_permission_relationship_attributes.append(
+                            AttributeAssignment(
+                                "expiration_date",
+                                safe_member_membership_expiration_date,
+                            )
+                        )
 
                 for safe_permission in safe_permissions_to_add:
-                    logger.debug("Handling Safe Permission %s on Safe Member %s", safe_permission["internal_name"], safeMember["memberName"])
+                    logger.debug(
+                        "Handling Safe Permission %s on Safe Member %s",
+                        safe_permission["internal_name"],
+                        safeMember["memberName"],
+                    )
                     # Check if the current safe member has a certain permission on the current safe
                     if safeMember["permissions"][safe_permission["internal_name"]] is True:
                         logger.debug(
@@ -1171,16 +1298,30 @@ def main():
                 account_entity_attributes.append(AttributeAssignment(account_property_name.lower(), StringValue(val)))
 
             timestamp_properties_to_add = [
-                {"account_property_name": "lastModifiedTime", "elimity_entity_attribute_name": "last_modified_time"},
-                {"account_property_name": "lastReconciledTime", "elimity_entity_attribute_name": "last_reconciled_time"},
-                {"account_property_name": "lastVerifiedTime", "elimity_entity_attribute_name": "last_verified_time"},
+                {
+                    "account_property_name": "lastModifiedTime",
+                    "elimity_entity_attribute_name": "last_modified_time",
+                },
+                {
+                    "account_property_name": "lastReconciledTime",
+                    "elimity_entity_attribute_name": "last_reconciled_time",
+                },
+                {
+                    "account_property_name": "lastVerifiedTime",
+                    "elimity_entity_attribute_name": "last_verified_time",
+                },
             ]
 
             for timestamp_property in timestamp_properties_to_add:
                 # If the account has the property set, add it as an entity attribute
                 if account.get("secretManagement", {}).get(timestamp_property["account_property_name"], False):
                     if (timestamp := _safe_fromtimestamp(account.get("secretManagement", {}).get(timestamp_property["account_property_name"], ""))) is not None:
-                        account_entity_attributes.append(AttributeAssignment(timestamp_property["elimity_entity_attribute_name"], timestamp))
+                        account_entity_attributes.append(
+                            AttributeAssignment(
+                                timestamp_property["elimity_entity_attribute_name"],
+                                timestamp,
+                            )
+                        )
 
             extended_account_details = get_extended_account_details(
                 pvwa_url,
@@ -1191,14 +1332,38 @@ def main():
 
             if extended_account_details:
                 account_entity_attributes = account_entity_attributes + [
-                    AttributeAssignment("compliance_is_compliant", BooleanValue(extended_account_details.get("Compliance", {}).get("IsCompliant", None))),
-                    AttributeAssignment("last_modified_by", StringValue(extended_account_details.get("Compliance", {}).get("LastModifiedBy", None))),
-                    AttributeAssignment("last_modification_type", StringValue(extended_account_details.get("Compliance", {}).get("ModificationType", None))),
-                    AttributeAssignment("cpm_disable_reason", StringValue(extended_account_details.get("Details", {}).get("CPMDisabled", None))),
-                    AttributeAssignment("cpm_status", StringValue(extended_account_details.get("Details", {}).get("CPMStatus", None))),
-                    AttributeAssignment("cpm_error_details", StringValue(extended_account_details.get("Details", {}).get("CPMErrorDetails", None))),
-                    AttributeAssignment("deleted_by", StringValue(extended_account_details.get("Details", {}).get("DeletedBy", None))),
-                    AttributeAssignment("dual_control_status", StringValue(extended_account_details.get("Details", {}).get("DualControlStatus", None))),
+                    AttributeAssignment(
+                        "compliance_is_compliant",
+                        BooleanValue(extended_account_details.get("Compliance", {}).get("IsCompliant", None)),
+                    ),
+                    AttributeAssignment(
+                        "last_modified_by",
+                        StringValue(extended_account_details.get("Compliance", {}).get("LastModifiedBy", None)),
+                    ),
+                    AttributeAssignment(
+                        "last_modification_type",
+                        StringValue(extended_account_details.get("Compliance", {}).get("ModificationType", None)),
+                    ),
+                    AttributeAssignment(
+                        "cpm_disable_reason",
+                        StringValue(extended_account_details.get("Details", {}).get("CPMDisabled", None)),
+                    ),
+                    AttributeAssignment(
+                        "cpm_status",
+                        StringValue(extended_account_details.get("Details", {}).get("CPMStatus", None)),
+                    ),
+                    AttributeAssignment(
+                        "cpm_error_details",
+                        StringValue(extended_account_details.get("Details", {}).get("CPMErrorDetails", None)),
+                    ),
+                    AttributeAssignment(
+                        "deleted_by",
+                        StringValue(extended_account_details.get("Details", {}).get("DeletedBy", None)),
+                    ),
+                    AttributeAssignment(
+                        "dual_control_status",
+                        StringValue(extended_account_details.get("Details", {}).get("DualControlStatus", None)),
+                    ),
                 ]
 
                 # If the account has the DeletionDate set, add it as an entity attribute
@@ -1256,7 +1421,11 @@ def main():
             )
 
             if account["platformId"]:
-                logger.debug("Linking accountId %s to platformId %s", account["id"], account["platformId"])
+                logger.debug(
+                    "Linking accountId %s to platformId %s",
+                    account["id"],
+                    account["platformId"],
+                )
 
                 platform_to_account_relationship_attributes: List[AttributeAssignment] = []
                 platform_to_account_relationships.append(
