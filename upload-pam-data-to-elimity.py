@@ -362,6 +362,15 @@ def get_vault_users(pvwa_url, session_token, verify_ssl=True):
             len(users_list),
             total_users,
         )
+        if not page_users:
+            # The API may omit users, so an empty page means we're done even if Total isn't reached
+            if len(users_list) < total_users:
+                logger.warning(
+                    "Vault user API returned an empty page after %d users, but reported a total of %d; treating retrieval as complete",
+                    len(users_list),
+                    total_users,
+                )
+            break
         offset = len(users_list)
 
     unique_users: List = []
