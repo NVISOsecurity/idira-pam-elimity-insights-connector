@@ -17,6 +17,8 @@ Rename the `.env.example` file to `.env`, and uncomment the variables in *either
 
 Fill out the credential information with the user details you created in PAM / PrivCloud and the Elimity source information.
 
+Optional PAM API settings can be enabled by uncommenting `IDIRA_PAM_REQUEST_TIMEOUT` (request timeout in seconds; default: `60`) and `IDIRA_PAM_API_BATCH_SIZE` (records per paginated request; default: `100`) in `.env`.
+
 ## Prerequisites - Elimity Insights
 
 1. Create a new source in Elimity Insights using the "Custom" preset

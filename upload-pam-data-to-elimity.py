@@ -1,10 +1,13 @@
+import argparse
+import csv
 import requests
 import sys
 import logging
 
 from pathlib import Path
+from urllib.parse import unquote
 from fnmatch import fnmatchcase
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from os import getenv, environ
 from pprint import pformat
@@ -25,13 +28,11 @@ from elimity_insights_client import (
     StringValue,
 )
 
-# Timeout (in seconds) for all HTTP requests to avoid hanging indefinitely
-REQUEST_TIMEOUT = 60
+# Set by parse_args() to True when both EVD CSV path flags were passed
+EVD_CSV_PATHS_PROVIDED = False
 
-# Default batch size for paginated API requests to avoid requesting too many
-#  entities in a single request (which would cause the API to time out or return an error)
-API_BATCH_SIZE = 100
-
+# Accounts parsed from the EVD CSV files; populated by main() when EVD_CSV_PATHS_PROVIDED is True
+evd_accounts = None
 logger = logging.getLogger(__name__)
 
 
@@ -97,7 +98,7 @@ def authenticate(env_type, api_base, username, password, verify_ssl=True):
             headers=url_headers,
             data=url_params,
             verify=verify_ssl,
-            timeout=REQUEST_TIMEOUT,
+            timeout=IDIRA_PAM_REQUEST_TIMEOUT,
         )
         response.raise_for_status()
         logger.debug(
@@ -115,7 +116,7 @@ def authenticate(env_type, api_base, username, password, verify_ssl=True):
             "username": username,
             "password": password,
         }
-        response = requests.post(auth_url, json=auth_data, verify=verify_ssl, timeout=REQUEST_TIMEOUT)
+        response = requests.post(auth_url, json=auth_data, verify=verify_ssl, timeout=IDIRA_PAM_REQUEST_TIMEOUT)
         response.raise_for_status()
         logger.debug(
             "PAM Self-Hosted Authentication API response: status=%s, len=%d",
@@ -142,7 +143,7 @@ def logoff(env_type, api_base, session_token, verify_ssl=True):
         headers = {
             "Authorization": f"{session_token}",
         }
-        response = requests.post(auth_url, headers=headers, verify=verify_ssl, timeout=REQUEST_TIMEOUT)
+        response = requests.post(auth_url, headers=headers, verify=verify_ssl, timeout=IDIRA_PAM_REQUEST_TIMEOUT)
         response.raise_for_status()
         logger.debug(
             "PAM Self-Hosted Logoff API response: status=%s, len=%d",
@@ -164,7 +165,7 @@ def get_platforms(pvwa_url, session_token, verify_ssl=True):
         f"{pvwa_url}/api/platforms",
         headers=headers,
         verify=verify_ssl,
-        timeout=REQUEST_TIMEOUT,
+        timeout=IDIRA_PAM_REQUEST_TIMEOUT,
     )
     response.raise_for_status()
     logger.debug(
@@ -178,7 +179,7 @@ def get_platforms(pvwa_url, session_token, verify_ssl=True):
 
 def get_safes(pvwa_url, session_token, verify_ssl=True):
     """Retrieve all safes and return them as a list."""
-    batch_size: int = API_BATCH_SIZE
+    batch_size: int = IDIRA_PAM_API_BATCH_SIZE
     next_link: str = f"api/Safes?limit={batch_size}&offset=0&useCache=True"
     safes_list: List = []
 
@@ -191,7 +192,7 @@ def get_safes(pvwa_url, session_token, verify_ssl=True):
             f"{pvwa_url}/{next_link}",
             headers=headers,
             verify=verify_ssl,
-            timeout=REQUEST_TIMEOUT,
+            timeout=IDIRA_PAM_REQUEST_TIMEOUT,
         )
         response.raise_for_status()
 
@@ -222,7 +223,7 @@ def get_safe_members(pvwa_url, session_token, safeUrlId, verify_ssl=True):
         f"{pvwa_url}/api/Safes/{safeUrlId}/Members?filter=includePredefinedUsers eq true",
         headers=headers,
         verify=verify_ssl,
-        timeout=REQUEST_TIMEOUT,
+        timeout=IDIRA_PAM_REQUEST_TIMEOUT,
     )
 
     if response.status_code == 403:
@@ -244,7 +245,14 @@ def get_safe_members(pvwa_url, session_token, safeUrlId, verify_ssl=True):
 def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_ssl=True):
     """Get all accounts in a given safe and return them as a list."""
     logger.debug("get_accounts_per_safe: safeUrlId = %s", safeUrlId)
-    batch_size: int = API_BATCH_SIZE
+
+    if EVD_CSV_PATHS_PROVIDED:
+        logger.debug("get_accounts_per_safe: EVD CSV paths provided, filtering accounts from EVD CSV data for safeUrlId = %s", safeUrlId)
+        # safeUrlId may be URL-encoded (e.g. spaces as %20), so also compare the decoded value
+        safe_names = {safeUrlId, unquote(safeUrlId)}
+        return [a for a in evd_accounts or [] if a.get("safeName") in safe_names]
+
+    batch_size: int = IDIRA_PAM_API_BATCH_SIZE
 
     if env_type == "PRIVCLOUD_ISPSS":
         # If the target PAM environment is PrivCloud ISPSS, use the safeUrlId parameter as is
@@ -279,7 +287,7 @@ def get_accounts_per_safe(pvwa_url, session_token, env_type, safeUrlId, verify_s
             f"{pvwa_url}/{next_link}",
             headers=headers,
             verify=verify_ssl,
-            timeout=REQUEST_TIMEOUT,
+            timeout=IDIRA_PAM_REQUEST_TIMEOUT,
         )
         response.raise_for_status()
 
@@ -312,7 +320,7 @@ def get_extended_account_details(pvwa_url, session_token, accountId, verify_ssl=
         f"{pvwa_url}/api/extendedaccounts/{accountId}/overview",
         headers=headers,
         verify=verify_ssl,
-        timeout=REQUEST_TIMEOUT,
+        timeout=IDIRA_PAM_REQUEST_TIMEOUT,
     )
 
     if response.status_code != 200:
@@ -329,7 +337,7 @@ def get_extended_account_details(pvwa_url, session_token, accountId, verify_ssl=
 
 def get_vault_users(pvwa_url, session_token, verify_ssl=True):
     """Get all Vault users and return them as a list."""
-    batch_size: int = API_BATCH_SIZE
+    batch_size: int = IDIRA_PAM_API_BATCH_SIZE
     offset = 0
     users_list: List = []
     total_users = None
@@ -343,7 +351,7 @@ def get_vault_users(pvwa_url, session_token, verify_ssl=True):
             f"{pvwa_url}/api/Users?pageSize={batch_size}&pageOffset={offset}&ExtendedDetails=true",
             headers=headers,
             verify=verify_ssl,
-            timeout=REQUEST_TIMEOUT,
+            timeout=IDIRA_PAM_REQUEST_TIMEOUT,
         )
         if response.status_code == 403:
             logger.warning("Failed to retrieve Vault user list. Make sure the Vault API user has the 'Audit Users' authorization.")
@@ -392,7 +400,7 @@ def get_vault_user_details(pvwa_url, session_token, user_id, verify_ssl=True):
         f"{pvwa_url}/api/Users/{user_id}",
         headers=headers,
         verify=verify_ssl,
-        timeout=REQUEST_TIMEOUT,
+        timeout=IDIRA_PAM_REQUEST_TIMEOUT,
     )
 
     response.raise_for_status()
@@ -409,7 +417,7 @@ def get_vault_groups(pvwa_url, session_token, verify_ssl=True):
         f"{pvwa_url}/api/UserGroups?includeMembers=true",
         headers=headers,
         verify=verify_ssl,
-        timeout=REQUEST_TIMEOUT,
+        timeout=IDIRA_PAM_REQUEST_TIMEOUT,
     )
 
     if response.status_code == 403:
@@ -449,11 +457,135 @@ def parse_log_level(value: str | None) -> int | None:
     return supported_levels[normalized_value]
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Upload Idira PAM data to Elimity Insights.")
+    parser.add_argument(
+        "--evd_files_list_path",
+        required=False,
+        dest="evd_files_list_path",
+        type=str,
+        help="Path to the CSV file containing the EVD accounts list, generated through EVD (Export Vault Data) using the '/FilesList' option.",
+    )
+    parser.add_argument(
+        "--evd_object_properties_list_path",
+        required=False,
+        dest="evd_object_properties_list_path",
+        type=str,
+        help="Path to the CSV file containing the EVD account properties list, generated through EVD (Export Vault Data) using the '/ObjectProperties' option.",
+    )
+    args = parser.parse_args()
+    if bool(args.evd_files_list_path) != bool(args.evd_object_properties_list_path):
+        parser.error("--evd_files_list_path and --evd_object_properties_list_path must be used together.")
+    global EVD_CSV_PATHS_PROVIDED
+    EVD_CSV_PATHS_PROVIDED = bool(args.evd_files_list_path and args.evd_object_properties_list_path)
+    return args
+
+
+def read_csv_file(path: str) -> List[dict]:
+    """Read a CSV file into a list of row dicts. Uses ',' as the delimiter unless
+    the header line contains more ';' than ',' characters, in which case ';' is used."""
+    with open(path, newline="", encoding="utf-8-sig") as csv_file:
+        header = csv_file.readline()
+        csv_file.seek(0)
+        delimiter = ";" if header.count(";") > header.count(",") else ","
+        reader = csv.DictReader(csv_file, delimiter=delimiter)
+        reader.fieldnames = [name.replace("<", "").replace(">", "").strip() for name in reader.fieldnames or []]
+        return list(reader)
+
+
+def parse_evd_csv_files(files_list_path: str, object_properties_list_path: str) -> List[dict]:
+    """Parse the EVD FilesList and ObjectProperties CSV files into a list of accounts (Type = 2),
+    each enriched with its object properties as additional keys."""
+    accounts = read_csv_file(files_list_path)
+    object_properties = read_csv_file(object_properties_list_path)
+
+    def get_ci(row: dict, name: str):
+        # Column casing differs between the two exports (e.g. SafeID vs SafeId)
+        for key, value in row.items():
+            if key.lower() == name.lower():
+                return value
+        return None
+
+    accounts = [a for a in accounts if str(get_ci(a, "Type") or "").strip() == "2"]
+
+    for account in accounts:
+        account["AccountID"] = f"{get_ci(account, 'SafeID')}_{get_ci(account, 'FileID')}"
+
+    properties_by_account = {}
+    for prop in object_properties:
+        prop["AccountID"] = f"{get_ci(prop, 'SafeID')}_{get_ci(prop, 'FileID')}"
+        properties_by_account.setdefault(prop["AccountID"], []).append(prop)
+
+    def to_epoch(value, date_format="%d.%m.%Y %H:%M:%S"):
+        # EVD dates are formatted as 'dd.mm.yyyy HH:MM:SS' (assumed UTC); some properties are already epoch seconds
+        if not value:
+            return None
+        value = str(value).strip()
+        if value.isdigit():
+            return int(value)
+        try:
+            return int(datetime.strptime(value, date_format).replace(tzinfo=timezone.utc).timestamp())
+        except ValueError:
+            return None
+
+    # Object properties that are mapped to dedicated fields or are internal, and therefore
+    # not included in platformAccountProperties
+    non_platform_properties = {
+        "Address", "UserName", "PolicyID", "DeviceType", "CreationMethod", "ConfigurationSchemaVersion",
+        "CPMStatus", "CPMDisabled", "CPMErrorDetails", "RetriesCount", "SequenceID", "LastTask",
+        "LastFailDate", "LastSuccessChange", "LastSuccessReconciliation", "LastSuccessVerification",
+        "LastPlatformTimeToHandle", "NextPeriodicChangeSearch", "NextPeriodicVerifySearch",
+    }  # fmt: skip
+
+    result = []
+    for account in accounts:
+        props = {}
+        for prop in properties_by_account.get(account["AccountID"], []):
+            if name := get_ci(prop, "ObjectPropertyName"):
+                props[name] = get_ci(prop, "ObjectPropertyValue")
+
+        secret_management = {}
+        if props.get("CPMStatus"):
+            secret_management["status"] = props["CPMStatus"]
+            secret_management["automaticManagementEnabled"] = True
+        for key, value in (
+            ("lastModifiedTime", get_ci(account, "ModificationDate")),
+            ("lastReconciledTime", props.get("LastSuccessReconciliation")),
+            ("lastVerifiedTime", props.get("LastSuccessVerification")),
+        ):
+            if (timestamp := to_epoch(value)) is not None:
+                secret_management[key] = timestamp
+
+        result.append(
+            {
+                "id": account["AccountID"],
+                "name": get_ci(account, "FileName"),
+                "address": props.get("Address", ""),
+                "userName": props.get("UserName", get_ci(account, "UserName")),
+                "platformId": props.get("PolicyID", ""),
+                "safeName": get_ci(account, "SafeName"),
+                "createdTime": to_epoch(get_ci(account, "CreationDate")),
+                "platformAccountProperties": {k: v for k, v in props.items() if k not in non_platform_properties and not k.startswith("ExtraPass")},
+                "secretManagement": secret_management,
+                "secretType": "password",
+            }
+        )
+
+    logger.debug("parse_evd_csv_files: parsed %d accounts", len(result))
+    return result
+
+
 def main():
     # Create and configure logger
     logger.setLevel(logging.INFO)
 
     env_file = Path(".env")
+
+    if not env_file.is_file():
+        logger.error(
+            f"⚠️  Required .env file not found at '{env_file.resolve()}! Rename the provided '.env.example' file to '.env' and fill in the required configuration variables. See the README.md for more details."
+        )
+        sys.exit(1)
 
     # Create log handlers
     console_handler = logging.StreamHandler()
@@ -466,12 +598,6 @@ def main():
     # Add handlers to the logger
     logger.addHandler(console_handler)
 
-    if not env_file.is_file():
-        logger.error(
-            f"⚠️  Required .env file not found at '{env_file.resolve()}! Rename the provided '.env.example' file to '.env' and fill in the required configuration variables. See the README.md for more details."
-        )
-        sys.exit(1)
-
     # Clear config variables from local environment to avoid using a variable that is not defined in the dotfile
     logger.debug("Clearing all environment variables that begin with 'ELIMITY_'")
     [environ.pop(key) for key in list(environ.keys()) if key.startswith("ELIMITY_")]
@@ -481,6 +607,16 @@ def main():
     # Load config variables from dotenv file
     logger.debug("Loading configuration variables from dotfile into environment")
     load_dotenv(dotenv_path=env_file, override=True)
+
+    global IDIRA_PAM_REQUEST_TIMEOUT, IDIRA_PAM_API_BATCH_SIZE
+    try:
+        IDIRA_PAM_REQUEST_TIMEOUT = int(getenv("IDIRA_PAM_REQUEST_TIMEOUT", "60"))
+        IDIRA_PAM_API_BATCH_SIZE = int(getenv("IDIRA_PAM_API_BATCH_SIZE", "100"))
+        if IDIRA_PAM_REQUEST_TIMEOUT <= 0 or IDIRA_PAM_API_BATCH_SIZE <= 0:
+            raise ValueError("timeout and batch size must be positive integers")
+    except ValueError as e:
+        logger.error("Invalid PAM request timeout or API batch size: %s", e)
+        sys.exit(1)
 
     log_level = parse_log_level(getenv("IDIRA_PAM_LOGFILE_LOG_LEVEL", "INFO"))
 
@@ -536,6 +672,21 @@ def main():
     )
     add_combination_attributes = _str_to_bool(getenv("ELIMITY_ADD_COMBINATION_ATTRIBUTES", "False"))
     combination_attribute_value_delimiter = getenv("ELIMITY_COMBINATION_ATTRIBUTE_VALUE_DELIMITER", "_")
+
+    args = parse_args()
+
+    global evd_accounts
+    evd_accounts = None
+    if EVD_CSV_PATHS_PROVIDED:
+        try:
+            logger.info("Parsing EVD CSV files from provided paths")
+            evd_accounts = parse_evd_csv_files(args.evd_files_list_path, args.evd_object_properties_list_path)
+            logger.debug("------------------------------------------------")
+            logger.debug("Parsed accounts list from EVD CSV files: %s", pformat(evd_accounts))
+            logger.debug("------------------------------------------------")
+        except (OSError, UnicodeDecodeError, csv.Error) as e:
+            logger.error(f"Failed to read EVD CSV file: {e}")
+            sys.exit(1)
 
     # Authenticate to Idira PAM environment
     session_token = authenticate(
@@ -670,27 +821,27 @@ def main():
     logger.debug("Retrieving platforms via Idira PAM REST API")
     platforms = get_platforms(pvwa_url, session_token, idira_pam_verify_ssl)
     logger.info(f"📑 Retrieved {len(platforms)} Platforms via Idira PAM REST API")
-    logger.debug(pformat(platforms))
+    # logger.debug(pformat(platforms))
 
     # Retrieve safes
     logger.debug("Retrieving safes via Idira PAM REST API")
     safes = get_safes(pvwa_url, session_token, idira_pam_verify_ssl)
     safes = sorted(safes, key=lambda safe: safe.get("safeName", "").lower())
     logger.info(f"📦 Retrieved {len(safes)} Safes via Idira PAM REST API")
-    logger.debug(pformat(safes))
+    # logger.debug(pformat(safes))
 
     # Retrieve vault users
     logger.debug("Retrieving Vault users via Idira PAM REST API")
     vault_users = get_vault_users(pvwa_url, session_token, idira_pam_verify_ssl)
 
     logger.info(f"👤 Retrieved {len(vault_users)} Users via Idira PAM REST API")
-    logger.debug(pformat(vault_users))
+    # logger.debug(pformat(vault_users))
 
     # Retrieve vault groups
     logger.debug("Retrieving Vault groups via Idira PAM REST API")
     vault_groups = get_vault_groups(pvwa_url, session_token, idira_pam_verify_ssl)
     logger.info(f"👥 Retrieved {len(vault_groups)} Groups via Idira PAM REST API")
-    logger.debug(pformat(vault_groups))
+    # logger.debug(pformat(vault_groups))
 
     #######################################################################
     ## Vault Authorizations Loop                                         ##
@@ -700,9 +851,11 @@ def main():
 
     # This loop creates "Vault Authorization" entities in Elimity (for example for the "Add/Update Users" authorization) that Vault user entities will later
     # be linked to.
-    for vault_authz in vault_authorizations_to_add:
+    for index, vault_authz in enumerate(vault_authorizations_to_add, start=1):
         logger.debug(
-            "Creating Vault Authorization entity: ID %s, Name %s",
+            "Creating Vault Authorization entity %d/%d: ID %s, Name %s",
+            index,
+            len(vault_authorizations_to_add),
             vault_authz["internal_name"],
             vault_authz["name"],
         )
@@ -721,9 +874,11 @@ def main():
 
     logger.info("🔄 Starting platforms loop")
 
-    for platform in platforms:
+    for index, platform in enumerate(platforms, start=1):
         logger.debug(
-            "Handling platform name %s, ID %s",
+            "Handling platform %d/%d: Name %s, ID %s",
+            index,
+            len(platforms),
             platform["general"]["name"],
             platform["general"]["id"],
         )
@@ -813,8 +968,8 @@ def main():
 
     logger.info("🔄 Starting users loop")
 
-    for user in vault_users:
-        logger.debug("Handling user name %s, ID %s", user["username"], user["id"])
+    for index, user in enumerate(vault_users, start=1):
+        logger.debug("Handling user %d/%d: Name %s, ID %s", index, len(vault_users), user["username"], user["id"])
 
         if user["id"] == 0:
             logger.debug(
@@ -894,8 +1049,8 @@ def main():
 
     logger.info("🔄 Starting groups loop")
 
-    for group in vault_groups:
-        logger.debug("Handling group name %s, ID %s", group["groupName"], group["id"])
+    for index, group in enumerate(vault_groups, start=1):
+        logger.debug("Handling group %d/%d: Name %s, ID %s", index, len(vault_groups), group["groupName"], group["id"])
 
         vault_group_entity_attributes: List[AttributeAssignment] = [
             AttributeAssignment("description", StringValue(group["description"])),
@@ -917,8 +1072,8 @@ def main():
     #######################################################################
     logger.info("🔄 Starting groups->users loop")
 
-    for group in vault_groups:
-        logger.debug("Handling group name %s, ID %s", group["groupName"], group["id"])
+    for index, group in enumerate(vault_groups, start=1):
+        logger.debug("Handling group %d/%d: Name %s, ID %s", index, len(vault_groups), group["groupName"], group["id"])
 
         for group_member in group["members"]:
             logger.debug("Handling member ID %s", group_member["id"])
@@ -973,8 +1128,8 @@ def main():
     #######################################################################
 
     logger.info("🔄 Starting safes loop")
-    for safe in safes:
-        logger.debug("Handling safe name %s", safe["safeName"])
+    for index, safe in enumerate(safes, start=1):
+        logger.debug("Handling safe %d/%d: Name %s", index, len(safes), safe["safeName"])
         # Skip processing this safe if the name matches any configured pattern.
         if _matches_any_pattern(safe["safeName"], safes_to_skip_patterns):
             logger.info(f"  ⏩ {safe['safeName']:<30}[skipped]")
@@ -1102,7 +1257,7 @@ def main():
         # Get Safe Members per Safe
         safe_members = get_safe_members(pvwa_url, session_token, safe["safeUrlId"], idira_pam_verify_ssl)
 
-        logger.debug("Safe Members of Safe %s = %s", safe["safeName"], pformat(safe_members))
+        # logger.debug("Safe Members of Safe %s = %s", safe["safeName"], pformat(safe_members))
         for safeMember in safe_members:
             logger.debug("Processing Safe Member: %s", safeMember["memberName"])
 
@@ -1274,9 +1429,11 @@ def main():
 
         logger.debug("Accounts in Safe %s = %s", safe["safeName"], pformat(accounts))
 
-        for account in accounts:
+        for index, account in enumerate(accounts, start=1):
             logger.debug(
-                "Processing Account: %s on %s",
+                "Processing Account %d/%d: %s on %s",
+                index,
+                len(accounts),
                 account.get("userName", "<EMPTY_USERNAME>"),
                 account.get("address", "<EMPTY_ADDRESS>"),
             )
